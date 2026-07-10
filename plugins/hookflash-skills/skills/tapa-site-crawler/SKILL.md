@@ -1,0 +1,52 @@
+---
+name: tapa-site-crawler
+description: Crawl a website with Tapa's Site Crawler via the Tether MCP — a one-off crawl of up to 10,000 pages returning the full crawl CSV as a download link in chat. Use when the user runs /tapa-site-crawler, asks to crawl a site, or needs a fresh crawl file (e.g. as input for the redirect mapper, cannibalisation detector or internal link audit).
+---
+
+# Tapa Site Crawler
+
+Crawl a site and hand back the **crawl CSV** (URLs with status codes, titles and on-page
+fields). The deliverable is the file — this tool has no chart visualisation. The CSV is also
+the natural input for `/tapa-cannibalisation-detector`, `/tapa-redirect-mapper` and
+`/tapa-internal-link-audit`.
+
+## Prerequisites (read first)
+
+- **Use your Tether MCP connector, signed in as an allow-listed user.** The `tapa_sc_*` tools
+  are gated to allow-listed users during rollout — if you don't see them, reconnect and confirm
+  you're on the allow-list.
+- Tools under the Tether MCP: `tapa_sc_options`, `tapa_sc_run`, `tapa_sc_result`.
+- **Works in normal claude.ai chat.** One-off crawls only — crawl *schedules* are managed in
+  the Tapa UI and are deliberately not available here.
+
+## Step 1 — Gather the inputs (ASK if the URL is missing; never guess)
+
+- **Site URL (REQUIRED)** → `url`, the full URL including `https://`. If the user named a
+  brand but not a URL, confirm the exact domain rather than guessing it.
+- **Page cap (OPTIONAL)** → `max_pages`. Defaults to 500; cap 10,000 (see `tapa_sc_options`).
+  Only ask if the user's intent is unclear (e.g. a very large site where 500 pages won't cut
+  it) — otherwise use the default silently.
+
+## Step 2 — Run and poll
+
+Call `tapa_sc_run`. Crawls take minutes on real sites:
+
+- If it returns `answer_status: "pending"` with a `job_id`, tell the user it's crawling
+  (progress reports pages crawled so far) and poll `tapa_sc_result` with that `job_id` until
+  it finishes. Never abandon a pending job or start a duplicate crawl.
+
+The finished output includes a **`download_url`** — the crawl CSV.
+
+## Step 3 — Deliver the CSV
+
+Put the `download_url` as a **plain clickable link in your reply** and mention it expires.
+No visualisation for this tool — a one-line description of what the CSV holds is enough.
+If the user wanted the crawl as input to another Tapa tool, offer to run that tool next
+(the CSV can be staged straight into it).
+
+## Guardrails
+
+- Crawl only sites the user/client owns or manages — decline requests to crawl arbitrary
+  third-party sites at scale.
+- Never fabricate crawl contents; if the user asks what was found, read the CSV rather than
+  guessing.

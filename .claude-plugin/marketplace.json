@@ -1,0 +1,20 @@
+{
+  "name": "hookflash",
+  "owner": {
+    "name": "Hookflash AI Ops",
+    "email": "connor.jennings@hookflash.co.uk"
+  },
+  "description": "Hookflash's certified Claude skills and connectors",
+  "plugins": [
+    {
+      "name": "hookflash-skills",
+      "source": "./plugins/hookflash-skills",
+      "description": "Certified Hookflash skills: SEO and analytics workflows, results analysis, and slide decks, powered by the Tether MCP"
+    },
+    {
+      "name": "hookflash-dev",
+      "source": "./plugins/hookflash-dev",
+      "description": "Developer-only skills for maintaining the AI Ops platform (not auto-installed org-wide)"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "tether": {
+      "type": "http",
+      "url": "https://tether-1046075401410.europe-west2.run.app/mcp"
+    }
+  }
+}
