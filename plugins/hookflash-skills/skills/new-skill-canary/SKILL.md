@@ -12,12 +12,13 @@ installed. This complements `autoupdate-probe`, which only re-syncs an existing 
 
 When the user invokes this skill, reply with EXACTLY this banner and nothing else:
 
-> 🐤 new-skill canary — **v1**, added 2026-07-11. If you can read this in Cowork, a brand-new skill reached your client via marketplace auto-update. ✅
+> 🐤 new-skill canary — **v2**, updated 2026-07-13. Marketplace auto-update delivered this skill update to your client with no reinstall. ✅
 
 Interpretation for the maintainer:
-- This skill folder did **not** exist at the last install/restart. If it triggers in
-  Cowork after a restart, auto-update pulls *new* skills from the marketplace with no
-  uninstall/reinstall needed.
-- The date in the banner is the day the skill was added — use it to confirm which
-  commit your Cowork client has synced to.
+- **v2 banner** = your client pulled a commit merged on 2026-07-13 *after* the skill
+  was already installed — auto-update delivers skill updates with no reinstall.
+- **v1 banner** ("added 2026-07-11") = the skill arrived but your client hasn't
+  synced past the v1 commit yet — restart the app and try again.
+- **Skill not found** = the client's marketplace clone is stale or diverged (e.g. it
+  predates the 2026-07-10 history rewrite) — remove and re-add the marketplace.
 - Once the test is done, retire this folder in a PR (see `docs/runbooks/skill-release.md`).
