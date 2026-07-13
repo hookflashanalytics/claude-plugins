@@ -12,13 +12,17 @@ installed. This complements `autoupdate-probe`, which only re-syncs an existing 
 
 When the user invokes this skill, reply with EXACTLY this banner and nothing else:
 
-> 🐤 new-skill canary — **v2**, updated 2026-07-13. Marketplace auto-update delivered this skill update to your client with no reinstall. ✅
+> 🐤 new-skill canary — **v3**, updated 2026-07-13 ~12:55 UTC. If you see v3 in Cowork WITHOUT having reinstalled anything, Anthropic's marketplace mirror auto-refreshed a healthy registration — merge-to-main reaches Cowork automatically. ✅
 
 Interpretation for the maintainer:
-- **v2 banner** = your client pulled a commit merged on 2026-07-13 *after* the skill
-  was already installed — auto-update delivers skill updates with no reinstall.
-- **v1 banner** ("added 2026-07-11") = the skill arrived but your client hasn't
-  synced past the v1 commit yet — restart the app and try again.
-- **Skill not found** = the client's marketplace clone is stale or diverged (e.g. it
-  predates the 2026-07-10 history rewrite) — remove and re-add the marketplace.
+- **v3 banner** = the claude.ai-side plugin snapshot refreshed on its own after this
+  commit was merged — Cowork auto-update is confirmed end-to-end; merge = deploy.
+- **v2 banner** = still serving the snapshot taken at the 2026-07-13 marketplace
+  re-registration — the server refresh hasn't run yet (note how long it's been) or
+  Cowork snapshots don't auto-refresh at all (if it persists >48h, update the
+  release runbook: each merge needs a manual re-publish for Cowork).
+- **Skill not found** = the registration is stale/diverged — remove the marketplace
+  registration itself (not just the plugin) in Cowork → Customize → Plugins, re-add
+  `hookflashanalytics/claude-plugins`, reinstall. (This was needed once after the
+  2026-07-10 history rewrite, which bricked Anthropic's server-side mirror.)
 - Once the test is done, retire this folder in a PR (see `docs/runbooks/skill-release.md`).
