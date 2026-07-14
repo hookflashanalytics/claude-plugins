@@ -94,17 +94,19 @@ the page body):
 # Proof / example output
 <links to real outputs; note if proof is still to come>
 
-# Proposed SKILL.md
-<the complete draft in a fenced ```markdown code block>
+# Proposed skill file
+<the complete SKILL.md draft in a fenced ```markdown code block>
 ```
 
-If there are supporting files, add each under its own heading
-(`# Proposed <filename>`) in its own fenced code block.
+If there are supporting files, add each under its own heading (`# Proposed file:` plus
+the filename in backticks) in its own fenced code block. In body prose and headings,
+always wrap filenames like `SKILL.md` in backticks — Notion auto-links bare filenames
+ending in `.md` into broken URLs.
 
 ## Step 5 — Verify and hand over (REQUIRED)
 
 Fetch the created row back. Confirm the title, `Status = Suggested`, and that the body
-contains the `Proposed SKILL.md` code block intact. Then give the user the row's URL and
+contains the proposed skill file's code block intact. Then give the user the row's URL and
 set expectations: suggestions are reviewed weekly, and they'll hear back on the row
 itself. If the fetch-back fails or the row is wrong, fix or recreate it before telling
 the user it's done.
