@@ -1,6 +1,6 @@
 # Hookflash claude-plugins
 
-The single source of truth for Hookflash's certified Claude skills. Merging to `main` **is** deployment: clients registered against this marketplace auto-update at startup and roughly hourly during sessions.
+The single source of truth for Hookflash's certified Claude skills. **A merged version-bump PR is the deployment**: Cowork's marketplace sync fires on it, and Claude Code clients registered against this marketplace pick it up at app startup.
 
 ## Layout
 
@@ -15,7 +15,9 @@ plugins/
     skills/
 ```
 
-Versioning is commit-based on purpose (no `version` fields): every merge to `main` is a release.
+**Versioning:** every release bumps the plugin `version` in `.claude-plugin/marketplace.json` (the per-plugin entry) **and** the plugin's own `plugin.json`, kept in lockstep — no exceptions. Cowork's marketplace sync only fires on a merged PR whose manifest version changed; a content-only merge deploys nowhere.
+
+⚠ **Never rewrite history on this repo** — no force-push, no rebase of pushed commits. Rewritten history silently and permanently breaks auto-update for every installed client *and* for Anthropic's server-side marketplace mirror that feeds Cowork; the only recovery is per-user re-registration of the marketplace. Fix mistakes in forward commits. If a secret lands on main, rotate it and remove it in a forward commit — treat it as an incident, not a history scrub.
 
 ## Governance (the short version)
 
@@ -31,7 +33,8 @@ Full rationale lives in the AI Ops docs (`docs/adr/0003-skill-governance.md` in 
 
 1. Branch, add `plugins/hookflash-skills/skills/<kebab-name>/SKILL.md` (frontmatter: `name`, `description` — the description drives triggering, so write it as "Use when the user asks to …").
 2. Include proof it works in the PR description.
-3. On merge: add a row to the Skill catalog in Notion (AI Ops hub) with a copy-paste example prompt, and re-upload the skill bundle to claude.ai org settings if web-chat users need it (see `docs/runbooks/skill-release.md` in the AI Ops folder).
+3. Bump the plugin `version` in `.claude-plugin/marketplace.json` and the plugin's `plugin.json` in lockstep (see Versioning above) — without this, the merge deploys nothing.
+4. On merge: add a row to the Skill catalog in Notion (AI Ops hub) with a copy-paste example prompt, and re-upload the skill bundle to claude.ai org settings if web-chat users need it (see `docs/runbooks/skill-release.md` in the AI Ops folder).
 
 ## Quality doctrine
 
