@@ -1,24 +1,18 @@
 ---
 name: suggest-a-skill
-description: Suggest a new Hookflash skill (or promote a personal skill you've built) — checks the idea against the certified skill list, makes sure a working skill file plus screenshot evidence exists (drafting the skill with you and sending you off to test it if not), then files a review-ready suggestion in the Suggest-a-skill backlog in Notion. Use when the user runs /suggest-a-skill, asks to suggest/propose/submit a skill idea, says "can we get a skill that…" or "I wish Claude could…" about a repeatable team job, wants a personal skill certified for the whole team, or comes back with test screenshots for a skill drafted in an earlier chat.
+description: Suggest a new Hookflash skill (or promote a personal skill you've built) — checks the idea against the certified skill list, drafts the complete skill file with you if it doesn't exist yet, and files a review-ready suggestion in the Suggest-a-skill backlog in Notion. Use when the user runs /suggest-a-skill, asks to suggest/propose/submit a skill idea, says "can we get a skill that…" or "I wish Claude could…" about a repeatable team job, or wants a personal skill certified for the whole team.
 ---
 
 # Suggest a skill
 
 File a **review-ready** skill suggestion into the **Suggest a skill** database in the
-Notion AI Ops hub. Review-ready means two things exist before anything is filed:
+Notion AI Ops hub. Review-ready means the reviewer opens the row and finds a finished
+draft — the complete proposed `SKILL.md`, written here while you have the submitter's
+full context — not a wish they'd have to interpret.
 
-1. **A working skill file** — the complete `SKILL.md`, drafted here if it doesn't exist yet.
-2. **Screenshot evidence of it working** — the submitter shows you screenshot(s) of the
-   skill producing its real output. **No screenshot, no submission — no exceptions.**
-
-Two pathways get there:
-
-- **Path A — the skill already exists** (a personal skill they've been using):
-  collect the skill file + screenshots, verify, file.
-- **Path B — no skill yet** (usually they want to suggest something off freeform work
-  they've just done): draft the skill with them, then **stop and send them off to test
-  it in a fresh chat**. They come back with screenshots → Path A.
+Testing is the submitter's responsibility, not a gate: review checks for duplicates and
+fit, so a skill that doesn't work as intended comes back on the submitter. Encourage
+testing before submission; never block on it.
 
 ## Prerequisites (read first)
 
@@ -28,16 +22,24 @@ Two pathways get there:
   page `https://app.notion.com/p/5d84a8b44163453ca18757436d917950`,
   data source `collection://0cccdf72-2485-4ab7-8efe-2ef3c9dc8fd7`.
 
-## Step 1 — Route
+## Step 1 — Route, and gather the one-liners
 
 Ask (or infer from context): **does this already exist as a personal skill — a written
 procedure they've actually run?**
 
-- **Yes, and they can share the skill file** → Path A.
-- **No — or "sort of, but it's in my head"** → Path B. A remembered habit is not a
-  skill file; draft it properly.
+- **Yes** → have them paste or upload the `SKILL.md`. If it doesn't meet the house
+  conventions in Step 3, tidy it with them (content unchanged, structure fixed), then
+  skip to Step 4.
+- **No** (usually they're suggesting off freeform work they've just done) → you'll
+  draft it in Step 3.
 
-## Step 2 — Overlap check (both paths, before any drafting)
+Along the way, collect the one-liners — from context or a quick ask, never an
+interrogation: **Skill idea** (short working name), **What it should do** (one
+sentence), **Current manual process** (one line — how the job is done today), and
+**Proof / example output** (a link to a real output if one exists; optional, but tell
+them it's the fast lane at review).
+
+## Step 2 — Overlap check (before drafting)
 
 Compare the idea against the certified skills already installed from this plugin (the
 hookflash-skills names and descriptions available in this session).
@@ -48,7 +50,7 @@ hookflash-skills names and descriptions available in this session).
   new skill filed, continue — the reviewer decides; you only set expectations.
 - **No overlap** → proceed.
 
-## Path B — Draft the skill, then dispatch to test (NO filing this session)
+## Step 3 — Draft the complete skill file (when none exists)
 
 Write the full `SKILL.md` now, with the user, grounding every step in the work they
 actually did (ideally the freeform job from this very chat) — never invent procedure to
@@ -63,50 +65,24 @@ fill space. House conventions the draft must follow:
 - **Grounding:** name the real tools/connectors each step uses only if the user actually
   used them — otherwise describe the step plainly and leave tooling to the reviewer.
 
-Iterate until the user says the draft matches how the job should work. Then:
+Iterate until the user says the draft matches how the job should work. If the skill
+needs supporting files (reference docs, examples), draft those too. Offer to help them
+save the draft as a personal skill (Cowork/claude.ai: add it as a personal
+skill/capability in settings; Claude Code: `~/.claude/skills/<name>/SKILL.md`) — that's
+how they can test it in a fresh chat before or after submitting.
 
-1. **Help them save it as a personal skill** in their client (Cowork/claude.ai: add it
-   as a personal skill/capability in settings; Claude Code: `~/.claude/skills/<name>/SKILL.md`).
-   If they can't install skills, the test still works: paste the drafted procedure at
-   the top of a fresh chat.
-2. **Dispatch them, verbatim:** "Open a **new chat**, run the skill on a real job,
-   screenshot the result — the output itself must be visible — then come back and run
-   /suggest-a-skill again with the screenshot(s) and the skill file."
-3. **STOP. Do not create the Notion row in this session.** The fresh-chat test is the
-   point: it proves the skill works without this conversation's context propping it up.
+## Step 4 — The note, then confirm and file
 
-## Path A — Evidence gate, then file
+Show the user the final package — the four one-liners and the skill file — together
+with this note, verbatim:
 
-### A1 — Collect the two artifacts
+> **Note: Please test this skill before submission. We review skills in Notion to
+> prevent duplicates, but ensuring they work as intended is the submitter's
+> responsibility.**
 
-- **The skill file:** have them paste or upload the `SKILL.md`. If it doesn't meet the
-  house conventions above, tidy it with them (content unchanged, structure fixed).
-- **The screenshot(s):** at least one, attached in this chat, showing the skill
-  **producing its real output** — the deliverable visible on screen, from a chat that
-  isn't this one. Screenshots of past runs are fine.
-
-### A2 — Verify the evidence (the gate)
-
-Inspect the screenshot(s) yourself. They must show the skill's actual output — a deck,
-a workbook, an analysis, a filed result — consistent with what the skill claims to do.
-Not acceptable: a description of what happened, a promise to test later, a screenshot
-showing only a prompt with no output, or output that doesn't match the skill.
-
-**If the evidence is missing or insufficient: do not file.** Say exactly what's needed
-and route them through Path B's dispatch step. No exceptions — the reviewer will not
-certify without evidence, so filing without it only queues a rejection.
-
-### A3 — Gather the one-liners
-
-From context or a quick ask: **Skill idea** (short working name), **What it should do**
-(one sentence), **Current manual process** (one line — how the job was done before the
-skill), **Proof** (one line saying what the screenshots show).
-
-### A4 — Confirm, then file
-
-Show the user the final package — the four one-liners, the skill file, and your reading
-of the evidence — and get an explicit go-ahead. Then create **one** new page in the data
-source above.
+If they'd rather test first, help them set up (Step 3's personal-skill install) and
+stop — they can run /suggest-a-skill again when ready. On an explicit go-ahead, create
+**one** new page in the data source above.
 
 **Properties are one-liners** (the table view is a scannable queue; full detail goes in
 the page body):
@@ -114,7 +90,8 @@ the page body):
 - `Skill idea` (title) — the working name.
 - `What should it do` — one sentence.
 - `Current manual process` — one line.
-- `Proof / example output` — one line, e.g. "Screenshots of a real run — see Evidence in the page".
+- `Proof / example output` — the link itself, or one line saying where proof lives
+  (leave empty if there is none).
 - `Status` = `Suggested` — never any other value.
 - `Submitted by` — the current Notion user, if your connector can set a person property;
   if it can't, skip it.
@@ -128,12 +105,9 @@ the page body):
 # Current manual process
 <numbered steps, as the user described them>
 
-# Evidence
-<your attestation: what each screenshot shows, when it was sighted, and that the
-output matches the skill's claim. Then this line, verbatim:>
-**Submitter: paste the screenshot(s) below this line — the reviewer will not
-certify without the images present in this section.**
-<plus links to any real outputs that live at a shareable URL>
+# Proof / example output
+<links to real outputs, and whether the submitter has tested the skill; "none yet" is
+an honest and acceptable answer>
 
 # Proposed skill file
 <the complete SKILL.md in a fenced ```markdown code block>
@@ -144,36 +118,31 @@ the filename in backticks) in its own fenced code block. In body prose and headi
 always wrap filenames like `SKILL.md` in backticks — Notion auto-links bare filenames
 ending in `.md` into broken URLs.
 
-### A5 — Verify and hand over (REQUIRED)
+## Step 5 — Verify and hand over (REQUIRED)
 
 Fetch the created row back. Confirm the title, `Status = Suggested`, and that the body
-contains the Evidence section and the proposed skill file's code block intact. Then give
-the user the row's URL with the **final railroaded step**: *"Open the row and paste your
-screenshot(s) into the Evidence section now — the submission isn't complete until the
-images are in."* (Your Notion connector cannot upload image files, so this one drag-and-
-drop is theirs.) Set expectations: suggestions are reviewed weekly; they'll hear back on
-the row itself.
+contains the proposed skill file's code block intact. Then give the user the row's URL
+and set expectations: suggestions are reviewed weekly, and they'll hear back on the row
+itself. If the fetch-back fails or the row is wrong, fix or recreate it before telling
+the user it's done.
 
 ## No-Notion fallback
 
-Apply the same gate: no screenshot sighted, no submission — route through Path B if
-needed. Once evidence is verified, output the full package — one-liners, Evidence
-attestation, and the skill file — as a tidy copy-paste block, link the AI Ops hub
+Output the full package — the four one-liners plus the drafted skill file — as a tidy
+copy-paste block (include the Step 4 note), link the AI Ops hub
 (`https://app.notion.com/p/399568ace9cf810ebb0af09f3305b7b9`), and tell the user to add
 it as a new row in **Suggest a skill** (one-liners in the fields, everything else in the
-page body, screenshots pasted into Evidence) — and to enable the Notion connector so
-this is automatic next time.
+page body) — and to enable the Notion connector so this is automatic next time.
 
 ## Guardrails
 
-- **The gate is absolute:** never file a row without having sighted screenshot evidence
-  of the skill working in this chat. "I'll add proof later" → Path B dispatch, not a row.
-- Evidence means the output is visible. A prompt with no result, a mock-up, or a verbal
-  description is not evidence.
 - One row per suggestion. Never edit or delete existing rows; never touch the Skill
   catalog database.
 - Never set `Status` to anything but `Suggested` — Reviewing/Approved/Rejected are the
   reviewer's moves.
+- Always show the Step 4 note before filing — never submit on the user's behalf without
+  it and their explicit go-ahead.
+- Be honest in the Proof section: never imply the skill was tested when it wasn't.
 - The drafted skill file is a **proposal**: tell the user the reviewer may edit it
   before certifying. Don't promise approval, a delivery date, or anything beyond
   "reviewed weekly".
