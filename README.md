@@ -11,9 +11,11 @@ plugins/
     .claude-plugin/plugin.json
     .mcp.json                        wires up the Tether MCP connector
     skills/<skill-name>/SKILL.md     one folder per certified skill
-  hookflash-dev/                     platform-dev skills, NOT auto-installed
-    skills/
 ```
+
+Maintainer/dev skills live in the **private** `claude-plugins-dev` marketplace (registered
+only by AI Ops), not here — this repo is public, so everything in it is world-readable and
+installable by anyone who adds the marketplace.
 
 **Versioning:** every release bumps the plugin `version` in `.claude-plugin/marketplace.json` (the per-plugin entry) **and** the plugin's own `plugin.json`, kept in lockstep — no exceptions. Cowork's marketplace sync only fires on a merged PR whose manifest version changed; a content-only merge deploys nowhere.
 

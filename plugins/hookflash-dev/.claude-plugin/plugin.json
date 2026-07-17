@@ -1,8 +1,0 @@
-{
-  "name": "hookflash-dev",
-  "version": "0.2.2",
-  "description": "Developer-only skills for maintaining the Hookflash AI Ops platform",
-  "author": {
-    "name": "Hookflash AI Ops"
-  }
-}
