@@ -10,9 +10,16 @@ with significance, and (3) — only when the user asks — an on-brand slide dec
 
 ## Prerequisites (read first)
 
-- **Use your Tether MCP connector, signed in as an allow-listed user.** The `tapa_ra_*` tools are
-  gated to allow-listed users during rollout (staging for everyone; production for allow-listed
-  users) — if you don't see them, reconnect and confirm you're on the allow-list.
+- **Use your Tether MCP connector.** The `tapa_ra_*` tools are limited to a small allow-list of
+  test users while Tapa skills are in testing.
+  - If NO Tether tools are available at all, the Tether connector isn't connected or enabled for
+    this session — tell the user to reconnect/enable it, then retry.
+  - If other Tether tools are available but the `tapa_ra_*` tools are missing, the user is not on
+    the allow-list: explain that Tapa skills are still in testing and access is limited to a small
+    test group for now — Connor Jennings (AI Ops) can add them.
+- **If a `tapa_ra_*` call fails with an authentication or authorisation error from Tapa**, the
+  user hasn't authenticated the Tapa app yet: direct them to https://tapa.hookflash.co.uk/connect
+  and explain they need to sign in there to authenticate the app, then retry.
 - **Works in normal claude.ai chat** when the analysis returns a structured `results` object and
   slides are built server-side (`tapa_ra_generate_deck`). **Cowork / Claude Code is only needed
   for the fallbacks** (parsing the `.xlsx` yourself, or local deck building) — see the fallback

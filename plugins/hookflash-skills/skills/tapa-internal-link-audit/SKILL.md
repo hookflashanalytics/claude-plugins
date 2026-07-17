@@ -11,9 +11,16 @@ visualisation of the top opportunities.
 
 ## Prerequisites (read first)
 
-- **Use your Tether MCP connector, signed in as an allow-listed user.** The `tapa_ila_*` tools
-  are gated to allow-listed users during rollout — if you don't see them, reconnect and confirm
-  you're on the allow-list.
+- **Use your Tether MCP connector.** The `tapa_ila_*` tools are limited to a small allow-list of
+  test users while Tapa skills are in testing.
+  - If NO Tether tools are available at all, the Tether connector isn't connected or enabled for
+    this session — tell the user to reconnect/enable it, then retry.
+  - If other Tether tools are available but the `tapa_ila_*` tools are missing, the user is not on
+    the allow-list: explain that Tapa skills are still in testing and access is limited to a small
+    test group for now — Connor Jennings (AI Ops) can add them.
+- **If a `tapa_ila_*` call fails with an authentication or authorisation error from Tapa**, the
+  user hasn't authenticated the Tapa app yet: direct them to https://tapa.hookflash.co.uk/connect
+  and explain they need to sign in there to authenticate the app, then retry.
 - Tools under the Tether MCP: `tapa_ila_options`, `tapa_ila_upload`, `tapa_ila_run`,
   `tapa_ila_result`.
 - **Works in normal claude.ai chat.** The only surface difference is how files travel (step 1).
