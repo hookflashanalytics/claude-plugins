@@ -10,9 +10,16 @@ Core Web Vitals per page, via Google PageSpeed Insights) and (2) an in-chat visu
 
 ## Prerequisites (read first)
 
-- **Use your Tether MCP connector, signed in as an allow-listed user.** The `tapa_ps_*` tools
-  are gated to allow-listed users during rollout — if you don't see them, reconnect and confirm
-  you're on the allow-list.
+- **Use your Tether MCP connector.** The `tapa_ps_*` tools are limited to a small allow-list of
+  test users while Tapa skills are in testing.
+  - If NO Tether tools are available at all, the Tether connector isn't connected or enabled for
+    this session — tell the user to reconnect/enable it, then retry.
+  - If other Tether tools are available but the `tapa_ps_*` tools are missing, the user is not on
+    the allow-list: explain that Tapa skills are still in testing and access is limited to a small
+    test group for now — Connor Jennings (AI Ops) can add them.
+- **If a `tapa_ps_*` call fails with an authentication or authorisation error from Tapa**, the
+  user hasn't authenticated the Tapa app yet: direct them to https://tapa.hookflash.co.uk/connect
+  and explain they need to sign in there to authenticate the app, then retry.
 - Tools under the Tether MCP: `tapa_ps_options`, `tapa_ps_run`, `tapa_ps_result`. (No upload
   tool — the input is just URLs.)
 - **Works in normal claude.ai chat.**

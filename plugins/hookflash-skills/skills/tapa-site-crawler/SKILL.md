@@ -12,9 +12,16 @@ the natural input for `/tapa-cannibalisation-detector`, `/tapa-redirect-mapper` 
 
 ## Prerequisites (read first)
 
-- **Use your Tether MCP connector, signed in as an allow-listed user.** The `tapa_sc_*` tools
-  are gated to allow-listed users during rollout — if you don't see them, reconnect and confirm
-  you're on the allow-list.
+- **Use your Tether MCP connector.** The `tapa_sc_*` tools are limited to a small allow-list of
+  test users while Tapa skills are in testing.
+  - If NO Tether tools are available at all, the Tether connector isn't connected or enabled for
+    this session — tell the user to reconnect/enable it, then retry.
+  - If other Tether tools are available but the `tapa_sc_*` tools are missing, the user is not on
+    the allow-list: explain that Tapa skills are still in testing and access is limited to a small
+    test group for now — Connor Jennings (AI Ops) can add them.
+- **If a `tapa_sc_*` call fails with an authentication or authorisation error from Tapa**, the
+  user hasn't authenticated the Tapa app yet: direct them to https://tapa.hookflash.co.uk/connect
+  and explain they need to sign in there to authenticate the app, then retry.
 - Tools under the Tether MCP: `tapa_sc_options`, `tapa_sc_run`, `tapa_sc_result`.
 - **Works in normal claude.ai chat.** One-off crawls only — crawl *schedules* are managed in
   the Tapa UI and are deliberately not available here.
