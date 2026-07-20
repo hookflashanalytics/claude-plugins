@@ -1,12 +1,12 @@
 ---
 name: tapa-results-analysis
-description: Analyse a Hookflash A/B test end-to-end — pull GA4 results via the Tether Tapa tools, compute significance, and visualise the results in chat with the raw conversion counts, a conversion-rate bar and a confidence-vs-threshold bar. Use when the user runs /tapa-results-analysis, pastes an experiment or ticket and asks how a test performed, or asks to analyse, report on, or read the results/significance of an A/B test. Building a slide or deck from the results is a SEPARATE skill — point the user to /create-slide-deck; do not build slides here.
+description: Analyse a Hookflash A/B test end-to-end — pull GA4 results via the Tether Tapa tools, compute significance, and visualise the results in chat with the raw converted-user counts, a conversion-rate bar and a confidence-vs-threshold bar. Use when the user runs /tapa-results-analysis, pastes an experiment or ticket and asks how a test performed, or asks to analyse, report on, or read the results/significance of an A/B test. Building a slide or deck from the results is a SEPARATE skill — point the user to /create-slide-deck; do not build slides here.
 ---
 
 # Run Results Analysis
 
 Turn an A/B test into (1) the Tapa results workbook and (2) an in-chat results visualisation that
-**always shows the raw conversion counts** and **how close each variation is to significance**.
+**always shows the raw converted-user counts** and **how close each variation is to significance**.
 **Slides are out of scope** — if the user wants a deck, they run the separate `/create-slide-deck`
 skill (see [Slides are a separate skill](#slides-are-a-separate-skill)).
 
@@ -64,10 +64,16 @@ Use the **`results` object** from the output — Tapa computes per-variation/per
 conversion rate, uplift, confidence and significance (matching Tapa's own panel). No parsing
 needed.
 
-**Always resolve a raw conversion COUNT for every variation, on every KPI — this is a hard
+**The KPI counts are CONVERTED USERS, not conversions.** Tapa queries GA4 `activeUsers` filtered
+to the KPI event, so each count is the number of *users who fired the event at least once* — not
+the number of times the event fired. The `results` JSON names this field `conversions` for
+historical reasons; **always label it "converted users" in everything you show** (the workbook
+itself heads the column "Converted Users"). Never call these figures "conversions".
+
+**Always resolve a raw converted-users COUNT for every variation, on every KPI — this is a hard
 requirement.** (A past report showed counts for some metrics but not others; that must not happen.)
 If `results` includes a count, use it; if it only gives users + rate, derive
-`conversions = round(users × conv_rate)`. For every percentage you show, you must be able to state
+`converted_users = round(users × rate)`. For every percentage you show, you must be able to state
 the "**X of Y users**" behind it.
 
 *Fallback (Cowork/Claude Code only):* if `results` is absent, download the `.xlsx` and compute with
@@ -86,18 +92,18 @@ only, **no external resources** (CDN scripts / chart libs / web fonts get blocke
 Render, per KPI, in this order, using the **Standard visualisation style** below:
 
 1. **Raw-values table (transparency — always):** columns
-   *variation · users · **conversions (count)** · conversion rate · uplift · confidence*.
-   Every row has a conversions count (derive if needed). Control shows "—" for uplift/confidence.
+   *variation · users · **converted users (count)** · conversion rate · uplift · confidence*.
+   Every row has a converted-users count (derive if needed). Control shows "—" for uplift/confidence.
    This table is the transparency layer — it must always be present.
 2. **Conversion-rate bar** — one horizontal bar per variation (control first). Label each bar with
-   **the rate AND the raw count**, e.g. `60.76%  ·  5,855 / 9,635`, so the percentage is never
-   shown without its underlying numbers.
+   **the rate AND the raw count**, e.g. `60.76%  ·  5,855 / 9,635` (converted users / users), so
+   the percentage is never shown without its underlying numbers.
 3. **Confidence bar (how close to significant)** — one horizontal bar per *variation* (not the
    control), scaled 0–100%, with a marked **95% significance threshold** line. This visualises how
    close the test is to a reliable result. Fill colour by band (see palette): ≥95% green,
    90–95% amber, <90% grey.
 4. **Verdict badge** — "Significant (NN.N% conf)" / "Not significant" / "Underpowered" (flag any
-   variation with very few conversions — e.g. <25 — as underpowered, not a real result).
+   variation with very few converted users — e.g. <25 — as underpowered, not a real result).
 5. **Header line:** property · date range · audiences.
 
 ### Standard visualisation style (use these exact values — consistency across every report)
@@ -131,7 +137,8 @@ pointing to the separate skill:
   render — do not render a `DOWNLOAD_URL_PLACEHOLDER` and re-render (that produces the visual twice).
 - **Charts must be real data bars** built from the numbers (inline SVG/CSS). Never decorative/abstract
   shapes or a generated image as "the graph".
-- **Never omit the conversion count** — every percentage must be backed by its "X of Y".
+- **Never omit the converted-users count** — every percentage must be backed by its "X of Y".
+- **Never label the counts "conversions"** — they are converted users (see Step 3).
 
 ## Slides are a separate skill
 
@@ -144,6 +151,8 @@ or build slides here.
 
 ## Notes
 - Never fabricate numbers — every figure comes from Tapa's `results` (or the derived
-  `conversions = round(users × conv_rate)`). If a KPI has too few conversions to be conclusive, say
-  so (surface it as underpowered).
-- Terminology: "variation" = a compared audience; "uplift" = variation rate ÷ control rate − 1.
+  `converted_users = round(users × rate)`). If a KPI has too few converted users to be conclusive,
+  say so (surface it as underpowered).
+- Terminology: "variation" = a compared audience; "converted users" = users who fired the KPI
+  event at least once (held in the `results` JSON's `conversions` field); "conversion rate" =
+  converted users ÷ users; "uplift" = variation rate ÷ control rate − 1.

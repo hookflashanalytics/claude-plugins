@@ -5,6 +5,10 @@ Pure standard-library (math only) so it runs anywhere. Feed it the raw counts
 parsed from the Tapa workbook; it returns conversion rates, uplift, a
 two-proportion z-test verdict, and a predicted end date.
 
+The "conversions" inputs hold CONVERTED USERS (GA4 activeUsers who fired the
+KPI event at least once), matching the workbook's "Converted Users" columns —
+label them "converted users" in any output.
+
 Usage:
     from stats import compare_variations, predicted_end_date
     res = compare_variations(control={"users":5162,"conversions":1859},
