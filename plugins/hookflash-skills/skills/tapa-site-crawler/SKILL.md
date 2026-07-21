@@ -5,10 +5,11 @@ description: Crawl a website with Tapa's Site Crawler via the Tether MCP — a o
 
 # Tapa Site Crawler
 
-Crawl a site and hand back the **crawl CSV** (URLs with status codes, titles and on-page
-fields). The deliverable is the file — this tool has no chart visualisation. The CSV is also
-the natural input for `/tapa-cannibalisation-detector`, `/tapa-redirect-mapper` and
-`/tapa-internal-link-audit`.
+Crawl a site and hand back the **crawl CSV** (URLs with status codes, titles, on-page
+fields and a `page_category` per page — Homepage / PDP / PLP / Article / Service / About /
+Contact / Other). The deliverable is the file — this tool has no chart visualisation. The
+CSV is also the natural input for `/tapa-cannibalisation-detector`, `/tapa-redirect-mapper`
+and `/tapa-internal-link-audit`.
 
 ## Prerequisites (read first)
 
@@ -26,17 +27,27 @@ the natural input for `/tapa-cannibalisation-detector`, `/tapa-redirect-mapper` 
 - **Works in normal claude.ai chat.** One-off crawls only — crawl *schedules* are managed in
   the Tapa UI and are deliberately not available here.
 
-## Step 1 — Gather the inputs (ASK if the URL is missing; never guess)
+## Step 1 — Gather the inputs (ASK if the URL or CMS is missing; never guess)
 
 - **Site URL (REQUIRED)** → `url`, the full URL including `https://`. If the user named a
   brand but not a URL, confirm the exact domain rather than guessing it.
+- **Site CMS (ASK if not provided)** → `cms`. The CMS sharpens each page's `page_category`
+  using that platform's URL conventions (e.g. Squarespace `/shop/p/…` is a product page,
+  Shopify `/blogs/…` is an article), and it feeds the crawl dashboard's page-type
+  breakdown. If the user hasn't said which platform the site runs on, ask — offer:
+  Shopify, WordPress (incl. WooCommerce), Magento / Adobe Commerce, BigCommerce,
+  Salesforce Commerce Cloud, Wix, Squarespace, Webflow, Drupal, or Custom / Unknown.
+  If they don't know or it's custom, omit `cms` — the crawl still categorises pages with
+  the generic rules. Never guess the CMS yourself, and never block a crawl on this
+  question if the user has already said they don't know.
 - **Page cap (OPTIONAL)** → `max_pages`. Defaults to 500; cap 10,000 (see `tapa_sc_options`).
   Only ask if the user's intent is unclear (e.g. a very large site where 500 pages won't cut
   it) — otherwise use the default silently.
 
 ## Step 2 — Run and poll
 
-Call `tapa_sc_run`. Crawls take minutes on real sites:
+Call `tapa_sc_run` (with `cms` when the user named a platform). Crawls take minutes on
+real sites:
 
 - If it returns `answer_status: "pending"` with a `job_id`, tell the user it's crawling
   (progress reports pages crawled so far) and poll `tapa_sc_result` with that `job_id` until
