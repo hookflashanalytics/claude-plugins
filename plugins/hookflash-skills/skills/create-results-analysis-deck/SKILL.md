@@ -41,20 +41,26 @@ This skill builds the deck by calling the **`build_slide_deck`** MCP tool
   invented design; the whole point is the real PEA template).
 - You do **not** need Cowork or any local tooling — building is server-side.
 
-## Step 1 — Gather the content (per test)
+## Step 1 — Assemble the content yourself (do NOT interview the user)
 
-The slide is **recommendation-led**, not a data dump. For each test you need:
+The slide is **recommendation-led**, not a data dump — and the whole point of
+this skill is that the user does not have to write it. **Never present a form
+or a list of follow-up questions.** Draft every field yourself from what is
+already in the chat:
 
-| Content | Where it comes from |
+| Content | Where you get it (no asking) |
 |---|---|
-| Test code + name | The ticket / the user (e.g. `HF-042: Sticky basket CTA`) |
-| Description (one line: what changed) | Ticket or user |
+| Test code + name | The ticket / analysis in the chat (e.g. `HF-042: Sticky basket CTA`) |
+| Description (one line: what changed) | Draft it from the ticket / test context |
 | Dates ran | The analysis date range |
-| Pages targeted | Ticket or user |
-| Results — the KPI numbers | **A completed results analysis in this chat** (the `results` object from `/tapa-results-analysis`), or numbers the user pastes. **Never invent or recompute numbers.** |
-| Learnings (one line) | Draft it from the result; confirm wording with the user if unsure |
-| Recommendations (one line) | Draft it from the result (roll out / iterate / stop); this is the slide's point — make it decisive |
-| Original + Variation screenshots | Optional — public **https** image URLs from the user. Ask once; don't block on it (there's a chart fallback) |
+| Results — the KPI numbers | **A completed results analysis in this chat** (the `results` object from `/tapa-results-analysis`), or numbers the user pasted. **Never invent or recompute numbers.** |
+| Learnings (one line) | Draft it from the result — what we now know |
+| Recommendations (one line) | Draft it from the result (roll out / iterate / stop); make it decisive |
+| Original + Variation screenshots | Only if image URLs are already in the chat. **Do not ask for them** — without them the right panel stays blank (see Step 2) |
+
+**The ONE question you may ask: "Which pages were targeted?"** — and only if
+the ticket/chat doesn't already say. Everything else you draft; the user can
+ask for tweaks after seeing the slide.
 
 If there is **no results analysis in the chat yet**, point the user to run
 `/tapa-results-analysis` first (it pulls the GA4 numbers this slide needs) —
@@ -75,7 +81,7 @@ One `slides[]` entry per test, always `"layout": 0`. Placeholder map
 | `"34"` | Learnings | One sentence — what we now know | ≤ ~150 chars |
 | `"33"` | Recommendations | One decisive sentence — roll out / iterate / stop | ≤ ~150 chars |
 | `"45"` / `"46"` | Right-panel labels | See visuals below | one line each |
-| `43` / `44` | Picture boxes (right panel) | `images` / `charts` / `remove` — see below | — |
+| `43` / `44` | Picture boxes (right panel) | `images` or `remove` — see below | — |
 
 Hard rules:
 - **Overview rows `31`/`35`/`36` are ONE paragraph each, label inline** — a
@@ -85,19 +91,18 @@ Hard rules:
 - Metric lines state the KPI, direction, uplift % and significance. Down =
   `"down x%"`. Not significant = say so with the confidence. The numbers come
   from the analysis — never rounded into a better story.
+- **No em dashes in slide text.** Never put "—" in any placeholder — use a
+  comma, a colon, or a shorter sentence instead (client-facing house style).
 
-**Right panel — pick ONE of these:**
-- **Screenshots (preferred):** `"images": [{"at": 43, "url": "<original>"},
-  {"at": 44, "url": "<variation>"}]`, `"45": "Original"`, `"46": "Variation"`.
-  Only user-supplied public https URLs — never invent imagery.
-- **No screenshots → chart fallback:** a native chart of the primary KPI in
-  box 43, its name in the label above:
-  `"charts": [{"at": 43, "type": "column", "categories": ["Control", "Variation"],
-  "series": {"Add-to-basket rate (%)": [4.9, 5.8]}}]`, `"45": "Add-to-basket rate (%)"`,
-  and `"remove": [44, 46]`. (Two KPIs? Put a second chart in 44 with its label
-  in 46 instead of removing them.)
-- **Neither:** `"remove": [43, 44, 45, 46]` — but prefer the chart; an empty
-  right panel wastes half the slide.
+**Right panel — screenshots or blank, NEVER a chart:**
+- **Screenshots (when image URLs are already in the chat):**
+  `"images": [{"at": 43, "url": "<original>"}, {"at": 44, "url": "<variation>"}]`,
+  `"45": "Original"`, `"46": "Variation"`. Only user-supplied public https
+  URLs — never invent imagery.
+- **No screenshots:** `"remove": [43, 44, 45, 46]` — the panel stays blank.
+  That is by design (it's reserved for variation imagery the user can paste
+  into the deck later). **Do not put a results chart or any other filler
+  there, and do not ask the user for screenshots.**
 
 ## Step 3 — Build
 
@@ -118,8 +123,8 @@ deliver a slide you haven't looked at.** Check each thumbnail for:
 - metric lines wrapping (shorten KPI names, not the numbers)
 - awkward screenshot crops (images are centre-cropped to portrait boxes —
   a full-page screenshot usually survives; a wide banner doesn't. If a crop
-  fails, swap that box to the chart fallback)
-- chart axis labels unreadable or the chart drowning in whitespace
+  fails, remove that image and its label and leave the box blank)
+- an em dash that slipped into slide text (house style: none, ever)
 
 Treat each `warnings` entry as guilty until the thumbnail proves it innocent.
 If a slide fails, fix the plan and rebuild — **at most two rebuild rounds**,
