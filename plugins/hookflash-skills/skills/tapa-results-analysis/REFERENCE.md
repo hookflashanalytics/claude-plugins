@@ -57,6 +57,6 @@ Feed that dict to `scripts/stats.py`. If a field is missing, say so rather than 
 
 ## Out of scope
 
-Slides/decks are a separate skill (`/create-slide-deck`) — no deck building, slide templates, or
-"Generate Slides" buttons here. The in-chat visualisation spec (including the standard style
+Slides/decks are a separate skill (`/create-results-analysis-deck`) — no deck building, slide
+templates, or "Generate Slides" buttons here. The in-chat visualisation spec (including the standard style
 block) lives in `SKILL.md`.

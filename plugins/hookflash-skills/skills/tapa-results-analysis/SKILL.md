@@ -1,14 +1,14 @@
 ---
 name: tapa-results-analysis
-description: Analyse a Hookflash A/B test end-to-end — pull GA4 results via the Tether Tapa tools, compute significance, and visualise the results in chat with the raw converted-user counts, a conversion-rate bar and a confidence-vs-threshold bar. Use when the user runs /tapa-results-analysis, pastes an experiment or ticket and asks how a test performed, or asks to analyse, report on, or read the results/significance of an A/B test. Building a slide or deck from the results is a SEPARATE skill — point the user to /create-slide-deck; do not build slides here.
+description: Analyse a Hookflash A/B test end-to-end — pull GA4 results via the Tether Tapa tools, compute significance, and visualise the results in chat with the raw converted-user counts, a conversion-rate bar and a confidence-vs-threshold bar. Use when the user runs /tapa-results-analysis, pastes an experiment or ticket and asks how a test performed, or asks to analyse, report on, or read the results/significance of an A/B test. Building a slide or deck from the results is a SEPARATE skill — point the user to /create-results-analysis-deck; do not build slides here.
 ---
 
 # Run Results Analysis
 
 Turn an A/B test into (1) the Tapa results workbook and (2) an in-chat results visualisation that
 **always shows the raw converted-user counts** and **how close each variation is to significance**.
-**Slides are out of scope** — if the user wants a deck, they run the separate `/create-slide-deck`
-skill (see [Slides are a separate skill](#slides-are-a-separate-skill)).
+**Slides are out of scope** — if the user wants a slide, they run the separate
+`/create-results-analysis-deck` skill (see [Slides are a separate skill](#slides-are-a-separate-skill)).
 
 ## Prerequisites (read first)
 
@@ -129,8 +129,8 @@ in your reply alongside the visual.
 **Do not offer or build slides here.** When the visualisation is done, add exactly one plain line
 pointing to the separate skill:
 
-> Want this as a slide? Run **`/create-slide-deck`** (in Cowork) — it builds an on-brand deck from
-> this analysis.
+> Want this as a slide? Run **`/create-results-analysis-deck`** — it fills Hookflash's PEA results
+> one-pager from this analysis.
 
 **Avoid these failures (seen in testing):**
 - **Never render with a placeholder URL.** Put the *actual* `download_url` into the link before you
@@ -145,9 +145,9 @@ pointing to the separate skill:
 Deck/slide generation has been **removed from this skill on purpose**. A results slide is about the
 **recommendation and the meaning** of the result, not the raw test detail — so it lives in its own
 skill and stays a one-slide-at-a-time, recommendation-led output. If the user wants a slide or deck,
-tell them to run **`/create-slide-deck`** (Cowork): it uses the real Hookflash template and can build
-a one-slide results summary from the analysis already in this chat. Do not call `tapa_ra_generate_deck`
-or build slides here.
+tell them to run **`/create-results-analysis-deck`**: it fills Hookflash's client-facing PEA results
+one-pager (Overview / Results / Learnings / Recommendations) from the analysis already in this chat.
+Do not call `tapa_ra_generate_deck` or build slides here.
 
 ## Notes
 - Never fabricate numbers — every figure comes from Tapa's `results` (or the derived
