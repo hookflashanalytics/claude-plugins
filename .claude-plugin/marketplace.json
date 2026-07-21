@@ -10,7 +10,7 @@
       "name": "hookflash-skills",
       "source": "./plugins/hookflash-skills",
       "description": "Certified Hookflash skills: SEO and analytics workflows, results analysis, and slide decks, powered by the Tether MCP",
-      "version": "0.7.0"
+      "version": "0.8.0"
     }
   ]
 }
