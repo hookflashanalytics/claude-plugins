@@ -1,12 +1,13 @@
 ---
-name: tapa-page-speedometer
-description: Test page speed with Tapa's Page Speedometer via the Tether MCP — Google PageSpeed Insights over a list of URLs, Lighthouse scores and Core Web Vitals visualised in chat with a workbook download link. Use when the user runs /tapa-page-speedometer, asks how fast pages are, wants Lighthouse/PSI/Core Web Vitals scores, or asks for a page speed report.
+name: tapa-page-speed-audit
+description: Test page speed with Tapa's Page Speed Audit (formerly Page Speedometer) via the Tether MCP — Google PageSpeed Insights over a list of URLs, Lighthouse scores and Core Web Vitals visualised in chat with a workbook download link. Use when the user runs /tapa-page-speed-audit (or the old /tapa-page-speedometer), asks how fast pages are, wants Lighthouse/PSI/Core Web Vitals scores, or asks for a page speed report. For a whole-site crawl-and-benchmark audit, that is the separate Full Site Speed Audit tool, not this one.
 ---
 
-# Tapa Page Speedometer
+# Tapa Page Speed Audit
 
-Turn a list of URLs into (1) the Page Speedometer workbook (Lighthouse performance scores +
+Turn a list of URLs into (1) the Page Speed Audit workbook (Lighthouse performance scores +
 Core Web Vitals per page, via Google PageSpeed Insights) and (2) an in-chat visualisation.
+(This tool was previously named "Page Speedometer" — same tool, same `tapa_ps_*` endpoints.)
 
 ## Prerequisites (read first)
 
