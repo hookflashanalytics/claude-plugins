@@ -58,9 +58,13 @@ already in the chat:
 | Recommendations (one line) | Draft it from the result (roll out / iterate / stop); make it decisive |
 | Original + Variation screenshots | Only if image URLs are already in the chat. **Do not ask for them** — without them the right panel stays blank (see Step 2) |
 
-**The ONE question you may ask: "Which pages were targeted?"** — and only if
-the ticket/chat doesn't already say. Everything else you draft; the user can
-ask for tweaks after seeing the slide.
+**The ONE thing you MUST get from the user: "Which pages were targeted?"**
+"Pages targeted" means the pages the variation was built and shown on — NOT
+where the KPI is measured. **Never infer it** (writing "sitewide" because the
+behaviour is tracked sitewide is exactly the mistake this rule exists to
+stop). If the ticket/chat states the targeted pages explicitly, use that;
+otherwise ASK this one question and wait for the answer before building.
+Everything else you draft; the user can ask for tweaks after seeing the slide.
 
 If there is **no results analysis in the chat yet**, point the user to run
 `/tapa-results-analysis` first (it pulls the GA4 numbers this slide needs) —
