@@ -54,6 +54,8 @@ Feed that dict to `scripts/stats.py`. If a field is missing, say so rather than 
   converted users = **underpowered** (call it out).
 - **Predicted end date** = required sample size for the target **MDE** at **power** (default 80%)
   and **alpha** (default 5%), minus users so far, divided by current daily users → days remaining.
+  The server computes this per non-significant variation as `time_to_significance` in the results
+  JSON (observed uplift as the MDE) — prefer that field over recomputing here.
 
 ## Out of scope
 

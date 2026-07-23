@@ -76,6 +76,14 @@ If `results` includes a count, use it; if it only gives users + rate, derive
 `converted_users = round(users × rate)`. For every percentage you show, you must be able to state
 the "**X of Y users**" behind it.
 
+**Days-to-significance projection:** each variation that is not yet significant carries
+`time_to_significance` — `{required_users_per_arm, days_elapsed, estimated_days_remaining,
+assumes}`, a fixed-horizon power projection (95% confidence, 80% power, the observed uplift as the
+minimum detectable effect). Surface `estimated_days_remaining` in the verdict. It assumes the
+observed rates and daily traffic continue — if the true effect is smaller than observed the test
+may never reach significance, so present it as an estimate, never a promise. (Absent on runs from
+before this field existed — just omit the line; do not derive it yourself.)
+
 *Fallback (Cowork/Claude Code only):* if `results` is absent, download the `.xlsx` and compute with
 `scripts/stats.py` (see REFERENCE.md).
 
@@ -104,6 +112,9 @@ Render, per KPI, in this order, using the **Standard visualisation style** below
    90–95% amber, <90% grey.
 4. **Verdict badge** — "Significant (NN.N% conf)" / "Not significant" / "Underpowered" (flag any
    variation with very few converted users — e.g. <25 — as underpowered, not a real result).
+   When not significant and `time_to_significance` is present, append the projection —
+   "Not significant — est. ~N more days at current traffic" — with a small footnote carrying the
+   Step 3 caveat (assumes observed rates/traffic hold; an estimate, not a promise).
 5. **Header line:** property · date range · audiences.
 
 ### Standard visualisation style (use these exact values — consistency across every report)
@@ -139,6 +150,19 @@ pointing to the separate skill:
   shapes or a generated image as "the graph".
 - **Never omit the converted-users count** — every percentage must be backed by its "X of Y".
 - **Never label the counts "conversions"** — they are converted users (see Step 3).
+
+## GA4 quota discipline (every run is expensive)
+
+Each analysis run costs several GA4 Data API requests against a **per-property hourly quota shared
+by the whole team** — batch decisions up front, don't iterate:
+
+- **Decide the date range once** before running. Never re-run the same test across multiple
+  windows to explore or "narrow down".
+- **Never probe a launch date with repeated runs.** To find when a test/audience started
+  collecting data, use ONE GA4 report — `date` dimension, filtered to the audience (e.g. via
+  Tether's `answer_client_data_question`) — and read the first active date.
+- **A zero-user audience is broken, not a date-range problem.** Do not retry other windows; tell
+  the user the audience is returning no users and needs checking in GA4.
 
 ## Slides are a separate skill
 
