@@ -103,23 +103,24 @@ the false-positive rate far above 5% (with enough looks, a null test will eventu
   *and* the caution; never substitute the cross-check for the headline figure.
 - **`not_testable_reason`** is now narrow: no users in a group, or no conversions in either group.
   Report the reason; never reconstruct a figure from the counts.
-- **Predicted end date.** `n = 2V(z_α+z_β)²/d²` per arm at 95% confidence / 80% power, divided by the
-  daily users of the **slower arm**, minus days elapsed. Same calculation as the workbook's hidden
-  `Sample Size` column. The server returns it as `time_to_significance` with an `outcome` of
-  `estimate`, `estimate_too_long` or `no_difference_yet` (SKILL.md Step 3 has the wording for each).
+- **Days to 95%.** `n = V·z_α²/d²` per arm (where `V` = the two arms' `p(1−p)` summed), divided by the
+  daily users of the **slower arm**, minus days elapsed. This is the significance test solved for `n`
+  instead of for confidence: feed that `n` back in at the same rates and it returns exactly 95.0000%,
+  so the countdown and the confidence column cannot drift apart. The server returns it as
+  `time_to_significance` with an `outcome` of `estimate`, `estimate_too_long` or `no_difference_yet`
+  (SKILL.md Step 3 has the wording for each).
 
-  **Know what it is.** This is a *prospective design* formula — "how many users would a test need to
-  have an 80% chance of detecting an effect of size d?" — pressed into answering a question about a
-  test already running. The object that would properly answer "will THIS test be significant by day
-  X" is conditional/predictive power, reporting a probability rather than a date. That rewrite is
-  recorded in ADR-0006 decision 9 as the better answer and is not built. Until it is, the only honest
-  reading is *"the sample a test would need for an 80% chance of resolving a gap this size"*.
+  **It is a central estimate, not a bound.** At the quoted day the test crosses 95% *if the gap is
+  still the size it is now*. The gap moves as data arrives and shrinks more often than it grows — a
+  gap looks its biggest at the moment someone checks on it — so arriving later is the likelier miss.
+  Replacing the estimate with a probability (conditional/predictive power) is recorded in ADR-0006
+  decision 9 as a possible future, not needed for this.
 
-  **It is not a countdown, and the difference is large.** Targeting 80% power makes the requirement
-  exactly `(z_α+z_β)²/z_α² = 2.043x` the sample at which the measured gap would *first* cross 95%. In
-  days *remaining* the two readings diverge by 2.4x to 6.2x, because elapsed days are subtracted from
-  both. So "if the current gap holds, significant in N days" is wrong by about a factor of two and
-  must never be said. The label the server returns names the basis for this reason.
+  **Not the same as the workbook's hidden `Sample Size` column.** That is the 80%-power *design*
+  sample size, `2V'(z_α+z_β)²/d²`, exactly `(z_α+z_β)²/z_α² = 2.043x` larger, and it answers "how big
+  should a NEW test be?". The countdown used to be sized with it, which overstated the wait by ~2x
+  (2.4x–6.2x in days *remaining*, since elapsed days come off both) and made tests 8 days from
+  resolving read as 30. Never quote the design figure as the countdown.
 
   It is sized against the **observed** gap (the inherited basis). A one-standard-error haircut was
   trialled and removed: uncalibrated, and the cautious figure it produced reached the reader in 0 of
@@ -127,13 +128,9 @@ the false-positive rate far above 5% (with enough looks, a null test will eventu
   comparison always has an interval containing zero. An agreed MDE replaces the basis when supplied
   (`basis: "mde"`), but nothing requires one.
 
-  **Two biases run in opposite directions and largely cancel**, which is why the figure is defensible
-  as it stands. It targets a fixed-horizon threshold, valid only at a single pre-committed look, so
-  anytime-valid inference would require materially *more*; but it is sized for 80% power rather than
-  the gap's crossing point, so it already reports 2.043x *more* than the deterministic reading.
-  Anytime-valid methods typically need ~1.5–2.5x the fixed-horizon crossing sample, the band this
-  figure already sits in. Do not present the date as tight, and do not describe the figure as simply
-  optimistic — it is conservative in one respect and optimistic in another.
+  **It is sized against a fixed-horizon threshold**, which is only valid at a single pre-committed
+  look. Under anytime-valid inference the required sample rises materially, so the estimate is
+  optimistic in that respect on top of the winner's-curse lean. Do not present it as tight.
 
 ### Audience mode is not a randomised experiment
 

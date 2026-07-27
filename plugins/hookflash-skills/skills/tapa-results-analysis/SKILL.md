@@ -126,28 +126,33 @@ a group, or no conversions in either group). When it is set, `confidence` and `s
 `null` **by design**. Report the reason. **Never fill the gap yourself** — do not compute a figure
 from the counts, and do not call it "not significant", which is a different statement.
 
-**Days-to-significance projection.** Read what this number *is* before reporting it. It answers
-"how long would a test need to have an 80% chance of resolving a gap this size, at 95% confidence?",
-sized against the gap measured so far. It is a **design requirement, not a countdown** — not a
-prediction about this test. If the real difference is smaller than the one measured — common, because
-a gap looks its biggest at the moment someone checks on it — it takes longer.
+**Days-to-significance projection.** This answers "**how much longer until this test reaches 95%
+confidence?**", assuming the gap stays about the size it is now and traffic continues at its current
+rate. It is the significance formula solved for sample size, so it agrees with the confidence figure
+by construction.
 
-Crucially, because it targets 80% power it is **about twice** the sample at which the measured gap
-would first cross 95%. So never phrase it as "if the current gap holds, significant in N days" — that
-reads as a countdown and is wrong by roughly a factor of two. Never give a date either.
+Report it as an estimate with its condition attached: **"~N more days to reach 95% if the current gap
+holds"**. It is a central estimate, not a promise — gaps shrink more often than they grow, so
+arriving later is the likelier miss. Say that if the number is close enough to matter to a decision.
+Still never give a calendar date.
 
 | `outcome` | Fields | Say |
 |---|---|---|
-| `estimate` | `days_remaining`, `users_remaining_per_arm`, `direction` | "~N more days to resolve a gap this size, at 95% confidence and 80% power" |
+| `estimate` | `days_remaining`, `users_remaining_per_arm`, `direction` | "~N more days to reach 95% if the current gap holds" |
 | `estimate_too_long` | same, plus `horizon_days` | "too long to be meaningful: ~N days, about M more users per arm" — **quote both figures**, they are the useful part |
 | `no_difference_yet` | — | "no difference measured yet, so there is nothing to project from" |
 
 `assumes` carries the full qualifier in the server's own words. If anyone asks how the figure was
 derived, quote it rather than paraphrasing.
 
+**Do not confuse it with the workbook's hidden `Sample Size` column**, which answers a different
+question — how big a *new* test would need to be to detect a gap this size, at 95% confidence and 80%
+power. That figure is about **twice** as large. Quoting it as the countdown makes a test look roughly
+twice as hopeless as it is.
+
 **Check `direction` before you word it.** The maths is sign-blind — a decline needs exactly as many
 users as an equivalent improvement — so `direction: "decline"` means the projection is time to
-**confirm a loss**, not time to a win. Say "~N days to confirm a decline this size". Never let a
+**confirm a loss**, not time to a win. Say "~N days to confirm the decline at 95%". Never let a
 losing variation's projection read as though a win is coming.
 
 **Never phrase any of these as impossibility.** Do not say the test "cannot" reach significance or
@@ -193,9 +198,10 @@ Render, per KPI, in this order, using the **Standard visualisation style** below
    Use "Not testable" whenever `not_testable_reason` is set, and put the reason itself in the
    badge's footnote — never substitute "Not significant", which claims something different.
    When not significant and `time_to_significance` is present, append the projection per the
-   `outcome` table in Step 3 — "~N more days if the current gap holds", or "too long to be
-   meaningful (~N days, ~M more users/arm)" — with a footnote carrying the Step 3 caveat (assumes
-   traffic holds and that the real gap is as big as the measured one; an estimate, not a date).
+   `outcome` table in Step 3 — "~N more days to reach 95% if the current gap holds", or "too long to
+   be meaningful (~N days, ~M more users/arm)" — with a footnote carrying the Step 3 caveat (assumes
+   traffic holds and the gap stays about its current size; a central estimate, not a date, and late
+   is the likelier miss).
    - **If the test is still running, the badge is a progress reading, not a decision.** Where the
      test has no agreed end point, label a crossing as "≥95% — but the test is still running"
      rather than a bare "Significant", and carry the peeking caveat from Step 3.
