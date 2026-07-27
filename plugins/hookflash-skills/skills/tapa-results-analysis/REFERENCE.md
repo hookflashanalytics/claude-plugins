@@ -103,21 +103,27 @@ the false-positive rate far above 5% (with enough looks, a null test will eventu
   *and* the caution; never substitute the cross-check for the headline figure.
 - **`not_testable_reason`** is now narrow: no users in a group, or no conversions in either group.
   Report the reason; never reconstruct a figure from the counts.
-- **Predicted end date** = required sample size at **power** (default 80%) and **alpha** (default
-  5%), divided by current daily users. The server computes this per testable, non-significant
-  variation as `time_to_significance`, with an `outcome` of `range`, `too_close_to_call`
-  or `estimate_too_long` (see SKILL.md Step 3 for what to say for each).
+- **Predicted end date.** `n = 2V(z_α+z_β)²/d²` per arm at 95% confidence / 80% power, divided by the
+  daily users of the **slower arm**, minus days elapsed. Same calculation as the workbook's hidden
+  `Sample Size` column. The server returns it as `time_to_significance` with an `outcome` of
+  `estimate`, `estimate_too_long` or `no_difference_yet` (SKILL.md Step 3 has the wording for each).
 
-  It is sized against the **observed gap less one standard error**, not the observed gap itself:
-  the observed uplift is inflated at exactly the moments someone looks (winner's curse), so
-  projecting from it promises dates tests do not hit. A 95% interval bound cannot be used instead —
-  a not-yet-significant comparison always has an interval containing zero, so it would answer
-  `too_close_to_call` every time. An agreed MDE, when one is supplied, replaces the basis entirely
+  **Know what it is.** This is a *prospective design* formula — "how many users would a test need to
+  have an 80% chance of detecting an effect of size d?" — pressed into answering a question about a
+  test already running. The object that would properly answer "will THIS test be significant by day
+  X" is conditional/predictive power, reporting a probability rather than a date. That rewrite is
+  recorded in ADR-0006 decision 9 as the better answer and is not built. Until it is, the only honest
+  reading is *"the time this test would need if the true effect matches what we have measured"*.
+
+  It is sized against the **observed** gap (the inherited basis). A one-standard-error haircut was
+  trialled and removed: uncalibrated, and the cautious figure it produced reached the reader in 0 of
+  246 measured scenarios. A 95% interval bound cannot be used instead — a not-yet-significant
+  comparison always has an interval containing zero. An agreed MDE replaces the basis when supplied
   (`basis: "mde"`), but nothing requires one.
 
-  It is an **estimate** and is labelled as one everywhere. `too_close_to_call` and `estimate_too_long` are
-  legitimate answers, and usually the most useful ones. Neither says the experiment cannot reach
-  significance — both describe the state of the estimate, which is cautious by design.
+  It is also optimistic for a second reason: it targets a **fixed-horizon** threshold, and under
+  anytime-valid inference the required sample rises materially. Do not quantify this; do not present
+  the date as tight.
 
 ### Audience mode is not a randomised experiment
 

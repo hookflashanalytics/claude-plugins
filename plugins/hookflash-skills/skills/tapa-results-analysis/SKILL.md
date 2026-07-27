@@ -126,36 +126,33 @@ a group, or no conversions in either group). When it is set, `confidence` and `s
 `null` **by design**. Report the reason. **Never fill the gap yourself** — do not compute a figure
 from the counts, and do not call it "not significant", which is a different statement.
 
-**Days-to-significance projection:** each variation that is not yet significant *and is testable*
-carries `time_to_significance`, whose `outcome` is one of three things. Read `outcome` first and
-report accordingly — do not reach past it for a number:
+**Days-to-significance projection.** Read what this number *is* before reporting it. It answers
+"how long would a test need to have an 80% chance of detecting a gap this size?", sized against the
+gap measured so far. It is **not** a prediction about this test. If the real difference is smaller
+than the one measured — common, because a gap looks its biggest at the moment someone checks on it —
+it takes longer.
+
+So phrase it as **"~N more days if the current gap holds"**, never "significant in N days" and never
+a date. Each variation that is not yet significant carries `time_to_significance` with an `outcome`:
 
 | `outcome` | Fields | Say |
 |---|---|---|
-| `range` | `days_remaining_optimistic`, `days_remaining_cautious`, `cautious_beyond_horizon` | "roughly N–M more days"; when `cautious_beyond_horizon` is true, "roughly N+ more days, possibly longer" |
-| `too_close_to_call` | `horizon_days` | "too close to call to estimate — the gap so far is within the margin of error" |
-| `estimate_too_long` | `horizon_days`, `days_remaining_optimistic` | "estimated time too long to be meaningful (over N days)" — always quote `horizon_days` so the reader knows what was hit |
+| `estimate` | `days_remaining`, `users_remaining_per_arm` | "~N more days if the current gap holds" |
+| `estimate_too_long` | same, plus `horizon_days` | "too long to be meaningful — ~N days, about M more users per arm" — **quote both figures**, they are the useful part |
+| `no_difference_yet` | — | "no difference measured yet, so there is nothing to project from" |
 
-**Never phrase either refusal as impossibility.** Do not say the test "cannot"
-reach significance, "will never" get there, or "cannot resolve in N days". Those
-are claims about the experiment; these fields are facts about **our estimate**,
-which is deliberately cautious — a test will often cross significance sooner than
-the figures imply. If asked what it means, the honest answer is "we can't put a
-useful number on it yet", not "it won't happen".
+**Never phrase any of these as impossibility.** Do not say the test "cannot" reach significance or
+"will never" get there. These describe our estimate, not a limit on the experiment. A test can and
+often does cross sooner than the figure implies.
 
-**Present it as an estimate, never a date the test will hit.** It assumes daily traffic continues,
-and it is sized against the observed gap **less one standard error** — deliberately cautious,
-because the observed gap is flattering at exactly the moments someone checks on a test (winner's
-curse). `basis` says which effect it used (`observed_less_one_se`, or `mde` when an agreed minimum
-detectable effect was supplied). Say "roughly N more days on current traffic" rather than
-"significant in N days".
+Two further caveats to carry when it matters:
 
-`too_close_to_call` and `estimate_too_long` are **useful answers, not failures** — often the most
-valuable thing the tool can say. Report them plainly rather than hunting for a number to show
-instead. Most in-flight tests land on one of them (measured: ~83% of projections), which is expected
-— an early or low-powered test genuinely cannot be projected. **But never report a bare refusal:
-always carry the condition or threshold it hit**, so it reads as an attempt rather than a shrug. (The whole field is absent on runs from before it existed — omit the line;
-never derive it yourself.)
+- The projection assumes daily traffic continues at its current rate, and `basis` says which effect
+  it used (`observed`, or `mde` when an agreed minimum detectable effect was supplied).
+- It is sized against a **fixed-horizon** threshold, so it is optimistic for a second reason if the
+  test is being re-read repeatedly. Do not quantify that — just do not present the date as tight.
+
+(The whole field is absent on runs from before it existed — omit the line; never derive it yourself.)
 
 *Fallback (Cowork/Claude Code only):* if `results` is absent, download the `.xlsx` and compute with
 `scripts/stats.py` (see REFERENCE.md).
@@ -187,11 +184,9 @@ Render, per KPI, in this order, using the **Standard visualisation style** below
    Use "Not testable" whenever `not_testable_reason` is set, and put the reason itself in the
    badge's footnote — never substitute "Not significant", which claims something different.
    When not significant and `time_to_significance` is present, append the projection per the
-   `outcome` table in Step 3 — "Not significant — roughly N–M more days on current traffic", or
-   "too close to call to estimate", or "estimated time too long to be meaningful (over N days)" —
-   with a footnote
-   carrying the Step 3 caveat (assumes traffic holds; sized against the observed gap less one
-   standard error; an estimate, not a date).
+   `outcome` table in Step 3 — "~N more days if the current gap holds", or "too long to be
+   meaningful (~N days, ~M more users/arm)" — with a footnote carrying the Step 3 caveat (assumes
+   traffic holds and that the real gap is as big as the measured one; an estimate, not a date).
    - **If the test is still running, the badge is a progress reading, not a decision.** Where the
      test has no agreed end point, label a crossing as "≥95% — but the test is still running"
      rather than a bare "Significant", and carry the peeking caveat from Step 3.
