@@ -64,6 +64,40 @@ Use the **`results` object** from the output — Tapa computes per-variation/per
 conversion rate, uplift, confidence and significance (matching Tapa's own panel). No parsing
 needed.
 
+### What "confidence" means, and when it counts — READ BEFORE WRITING ANY VERDICT
+
+**Confidence is the confidence that a gap this size is not luck.** It is `1 − p`, where `p` is the
+probability of seeing a gap at least this large if the variation and control were truly identical.
+
+**Never** describe it as the probability the variation is better, the probability the variation
+wins, or the chance the result "is real". Those are a different (Bayesian) quantity that this tool
+does not compute. Use the phrasing in bold above when the user asks what the number means.
+
+**A confidence figure is only a verdict at a pre-committed sample size.** Repeatedly checking a
+running test and calling it as soon as it crosses 95% is *optional stopping* — it pushes the true
+false-positive rate far above 5%, because a test that is genuinely doing nothing will still wander
+across the threshold if you look often enough.
+
+- **Do not present a mid-flight crossing of 95% as a result.** If the test has not reached a
+  planned end point, present confidence as a progress reading and say plainly that it is not yet a
+  decision.
+- If the user asks "is it significant yet?" mid-test, answer with the current uplift and confidence
+  **and** the caveat — do not answer with a yes.
+- Scheduled re-runs of the same experiment compound this. Every extra look is another chance to
+  cross by luck.
+
+**One KPI decides; the rest are exploratory.** A single run tests every KPI × 4 device splits ×
+every variation at α = 0.05 with **no multiple-comparison correction**. With 8 KPIs and one
+variation that is 32 tests, where at least one spurious "significant" is more likely than not.
+Lead with the KPI the test was designed to move, at the **overall** level. Report other KPIs and
+every device split as exploratory signals worth investigating, never as findings.
+
+**Audience mode is not automatically an experiment.** If the audiences being compared are the
+variation audiences of a real A/B test, users were randomised and causal language is fine. If they
+are any other GA4 audience (new vs returning, a behavioural segment), users **selected themselves**
+into the groups — report the comparison descriptively and do not say one group "caused" or "drove"
+the difference. Ask which situation applies if it is not obvious.
+
 **The KPI counts are CONVERTED USERS, not conversions.** Tapa queries GA4 `activeUsers` filtered
 to the KPI event, so each count is the number of *users who fired the event at least once* — not
 the number of times the event fired. The `results` JSON names this field `conversions` for
@@ -79,10 +113,16 @@ the "**X of Y users**" behind it.
 **Days-to-significance projection:** each variation that is not yet significant carries
 `time_to_significance` — `{required_users_per_arm, days_elapsed, estimated_days_remaining,
 assumes}`, a fixed-horizon power projection (95% confidence, 80% power, the observed uplift as the
-minimum detectable effect). Surface `estimated_days_remaining` in the verdict. It assumes the
-observed rates and daily traffic continue — if the true effect is smaller than observed the test
-may never reach significance, so present it as an estimate, never a promise. (Absent on runs from
-before this field existed — just omit the line; do not derive it yourself.)
+minimum detectable effect). Surface `estimated_days_remaining` in the verdict.
+
+**Present it as a rough indication, never a date the test will hit.** Two things bias it
+optimistic. It assumes the observed rates and daily traffic both continue; and the observed uplift
+standing in for the MDE is itself inflated — a variation looks best at exactly the moments someone
+checks on it (winner's curse), so projecting from today's uplift promises a crossing that a smaller
+true effect will not deliver. If the true effect is smaller than observed, the test may never reach
+significance no matter how long it runs. Say "at the current observed effect, roughly N more days"
+rather than "significant in N days". (Absent on runs from before this field existed — just omit the
+line; do not derive it yourself.)
 
 *Fallback (Cowork/Claude Code only):* if `results` is absent, download the `.xlsx` and compute with
 `scripts/stats.py` (see REFERENCE.md).
@@ -113,8 +153,15 @@ Render, per KPI, in this order, using the **Standard visualisation style** below
 4. **Verdict badge** — "Significant (NN.N% conf)" / "Not significant" / "Underpowered" (flag any
    variation with very few converted users — e.g. <25 — as underpowered, not a real result).
    When not significant and `time_to_significance` is present, append the projection —
-   "Not significant — est. ~N more days at current traffic" — with a small footnote carrying the
-   Step 3 caveat (assumes observed rates/traffic hold; an estimate, not a promise).
+   "Not significant — est. ~N more days at the current observed effect" — with a small footnote
+   carrying the Step 3 caveat (assumes observed rates/traffic hold, and the observed uplift is
+   itself optimistic; a rough indication, not a date).
+   - **If the test is still running, the badge is a progress reading, not a decision.** Where the
+     test has no agreed end point, label a crossing as "≥95% — but the test is still running"
+     rather than a bare "Significant", and carry the peeking caveat from Step 3.
+   - Badge the **primary KPI at the overall level** as the headline. Device splits and secondary
+     KPIs get their own rows but are labelled **exploratory** — never promote the best-looking one
+     to the headline.
 5. **Header line:** property · date range · audiences.
 
 ### Standard visualisation style (use these exact values — consistency across every report)
@@ -179,4 +226,9 @@ Do not call `tapa_ra_generate_deck` or build slides here.
   say so (surface it as underpowered).
 - Terminology: "variation" = a compared audience; "converted users" = users who fired the KPI
   event at least once (held in the `results` JSON's `conversions` field); "conversion rate" =
-  converted users ÷ users; "uplift" = variation rate ÷ control rate − 1.
+  converted users ÷ users; "uplift" = variation rate ÷ control rate − 1; "confidence" = `1 − p`
+  from a two-sided two-proportion test — **the confidence that a gap this size is not luck**, not
+  the probability the variation is better.
+- **Banned phrasings** (all assert something the tool does not compute): "NN% confident the
+  variation is better", "NN% probability the variation wins", "NN% chance the result is real",
+  "NN% sure it works". Say "NN% confidence that a gap this size is not luck" instead.

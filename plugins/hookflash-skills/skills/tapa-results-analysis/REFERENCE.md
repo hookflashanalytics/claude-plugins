@@ -47,15 +47,65 @@ Feed that dict to `scripts/stats.py`. If a field is missing, say so rather than 
 
 ## Statistics (scripts/stats.py)
 
+### What "Confidence" means — read before reporting any number
+
+Confidence is `1 − p` from a two-sided two-proportion test. **`p` is the probability of seeing a
+gap at least this big IF the variation and control were truly identical.** So:
+
+> **Confidence is the confidence that a gap this size is not luck.**
+
+It is **not** the probability the variation is better, not the probability the variation wins, and
+not the chance the result "is real". Those are Bayesian posterior quantities and this tool does not
+compute them — asserting them is the transposed-conditional fallacy. Use the wording above verbatim
+when you have to explain the number.
+
+### The peeking caveat — state this whenever a test is still running
+
+A confidence figure is only valid **at a sample size committed to before the test started**.
+Checking repeatedly and stopping when the number crosses 95% is *optional stopping*: it inflates
+the false-positive rate far above 5% (with enough looks, a null test will eventually cross).
+
+- **Never present a mid-flight crossing of 95% as a result.** If the test has not reached its
+  planned horizon, report the uplift and the confidence as a progress reading, not a verdict.
+- The tool encourages repeated evaluation (scheduled re-runs, a days-to-significance countdown).
+  That convenience does not make the mid-flight number a decision.
+
+### The numbers
+
 - **Conversion rate** = converted users / users per variation.
 - **Uplift** = variation_rate / control_rate − 1 (report as %).
-- **Significance** = two-proportion z-test → p-value → confidence = 1 − p. Flag **significant**
-  at the test's threshold (default 95%). Below threshold = **not significant**; very few
-  converted users = **underpowered** (call it out).
+- **Significance** = two-proportion test → p-value → confidence = 1 − p. Flag **significant** at
+  the test's threshold (default 95%) *only when the planned sample size has been reached*. Below
+  threshold = **not significant**; very few converted users = **underpowered** (call it out).
+  - The server uses an **unpooled** standard error (the confidence-interval form) rather than
+    pooling under the null. This is a deliberate choice — it matches Optimizely's fixed-horizon
+    frequentist mode and Minitab's default — and it moves the confidence figure by under
+    0.02 percentage points on realistic inputs.
+  - **Known inconsistency:** `scripts/stats.py` currently computes the **pooled** z-test, so this
+    fallback can differ from the server in the last decimal place. Prefer the server's `results`
+    object. (Reconciliation is tracked as a follow-up.)
+- **Multiple comparisons — uncorrected.** One run tests every KPI × 4 device splits × every
+  variation, each at α = 0.05, with **no correction applied**. Eight KPIs against one variation is
+  32 tests, at which point roughly a 4-in-5 chance of at least one spurious "significant" result is
+  expected under a true null. Treat one KPI at the overall level as the decision; everything else,
+  and every device split, is **exploratory** — report it as a signal to investigate, never as a
+  finding in its own right.
 - **Predicted end date** = required sample size for the target **MDE** at **power** (default 80%)
   and **alpha** (default 5%), minus users so far, divided by current daily users → days remaining.
   The server computes this per non-significant variation as `time_to_significance` in the results
-  JSON (observed uplift as the MDE) — prefer that field over recomputing here.
+  JSON. It currently uses the **observed** uplift as the MDE, which is biased optimistic — the
+  observed uplift is inflated at exactly the moments someone looks (winner's curse), so the
+  projected date is a floor, not an estimate. Present it as a rough indication only.
+
+### Audience mode is not a randomised experiment
+
+`tapa_ra_generate_audience_excel` compares arbitrary GA4 audiences. When those audiences are the
+variation audiences of a real A/B test, users were randomised and causal language is fair. When
+they are any other audience (returning vs new, mobile vs desktop, a behavioural segment), **users
+selected themselves into the groups**. The arithmetic still runs and still prints a confidence
+figure, but it carries no causal meaning: the groups differ in every way that made them different
+audiences, not just in the thing being compared. Report those as **descriptive comparisons** and do
+not claim one audience "caused" or "drove" the difference.
 
 ## Out of scope
 
