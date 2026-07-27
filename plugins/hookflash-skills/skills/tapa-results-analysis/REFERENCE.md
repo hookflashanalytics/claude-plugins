@@ -90,12 +90,25 @@ the false-positive rate far above 5% (with enough looks, a null test will eventu
   expected under a true null. Treat one KPI at the overall level as the decision; everything else,
   and every device split, is **exploratory** — report it as a signal to investigate, never as a
   finding in its own right.
-- **Predicted end date** = required sample size for the target **MDE** at **power** (default 80%)
-  and **alpha** (default 5%), minus users so far, divided by current daily users → days remaining.
-  The server computes this per non-significant variation as `time_to_significance` in the results
-  JSON. It currently uses the **observed** uplift as the MDE, which is biased optimistic — the
-  observed uplift is inflated at exactly the moments someone looks (winner's curse), so the
-  projected date is a floor, not an estimate. Present it as a rough indication only.
+- **Validity gate.** The server suppresses the confidence figure entirely when a comparison has
+  fewer than **25 converted** or **10 non-converting** users in either group, setting
+  `not_testable_reason` instead. Below those floors the arithmetic still returns a number and that
+  number is meaningless — 1 conversion against 9 at 300 users per arm computes to 99.0% confidence.
+  Report the reason; never reconstruct a figure from the counts.
+- **Predicted end date** = required sample size at **power** (default 80%) and **alpha** (default
+  5%), divided by current daily users. The server computes this per testable, non-significant
+  variation as `time_to_significance`, with an `outcome` of `range`, `may_never` or
+  `cannot_resolve` (see SKILL.md Step 3 for what to say for each).
+
+  It is sized against the **observed gap less one standard error**, not the observed gap itself:
+  the observed uplift is inflated at exactly the moments someone looks (winner's curse), so
+  projecting from it promises dates tests do not hit. A 95% interval bound cannot be used instead —
+  a not-yet-significant comparison always has an interval containing zero, so it would answer
+  `may_never` every time. An agreed MDE, when one is supplied, replaces the basis entirely
+  (`basis: "mde"`), but nothing requires one.
+
+  It is an **estimate** and is labelled as one everywhere. `may_never` and `cannot_resolve` are
+  legitimate answers, and usually the most useful ones.
 
 ### Audience mode is not a randomised experiment
 

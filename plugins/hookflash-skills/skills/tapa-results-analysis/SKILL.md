@@ -110,19 +110,37 @@ If `results` includes a count, use it; if it only gives users + rate, derive
 `converted_users = round(users × rate)`. For every percentage you show, you must be able to state
 the "**X of Y users**" behind it.
 
-**Days-to-significance projection:** each variation that is not yet significant carries
-`time_to_significance` — `{required_users_per_arm, days_elapsed, estimated_days_remaining,
-assumes}`, a fixed-horizon power projection (95% confidence, 80% power, the observed uplift as the
-minimum detectable effect). Surface `estimated_days_remaining` in the verdict.
+**No verdict when the comparison is not testable.** A variation may carry
+`not_testable_reason` — a sentence explaining why no confidence figure exists (too few converted
+users, or too few non-converting users, in one of the groups). When it is set, `confidence` and
+`significant` are `null` **by design**.
 
-**Present it as a rough indication, never a date the test will hit.** Two things bias it
-optimistic. It assumes the observed rates and daily traffic both continue; and the observed uplift
-standing in for the MDE is itself inflated — a variation looks best at exactly the moments someone
-checks on it (winner's curse), so projecting from today's uplift promises a crossing that a smaller
-true effect will not deliver. If the true effect is smaller than observed, the test may never reach
-significance no matter how long it runs. Say "at the current observed effect, roughly N more days"
-rather than "significant in N days". (Absent on runs from before this field existed — just omit the
-line; do not derive it yourself.)
+**Report the reason. Never fill the gap yourself** — do not compute a confidence figure from the
+counts, do not call it "not significant" (that is a different statement), and do not describe the
+variation as winning or losing. Show the rates and counts, and say the comparison cannot be tested
+yet and why. A suppressed number with a stated reason is a finding; a blank is a gap.
+
+**Days-to-significance projection:** each variation that is not yet significant *and is testable*
+carries `time_to_significance`, whose `outcome` is one of three things. Read `outcome` first and
+report accordingly — do not reach past it for a number:
+
+| `outcome` | Fields | Say |
+|---|---|---|
+| `range` | `days_remaining_optimistic`, `days_remaining_cautious`, `cautious_beyond_horizon` | "roughly N–M more days"; when `cautious_beyond_horizon` is true, "roughly N+ more days, possibly far longer" |
+| `may_never` | — | "this may never reach significance — the gap is too close to call" |
+| `cannot_resolve` | `horizon_days` | "this cannot resolve within N days at the current traffic" |
+
+**Present it as an estimate, never a date the test will hit.** It assumes daily traffic continues,
+and it is sized against the observed gap **less one standard error** — deliberately cautious,
+because the observed gap is flattering at exactly the moments someone checks on a test (winner's
+curse). `basis` says which effect it used (`observed_less_one_se`, or `mde` when an agreed minimum
+detectable effect was supplied). Say "roughly N more days on current traffic" rather than
+"significant in N days".
+
+`may_never` and `cannot_resolve` are **useful answers, not failures** — they are often the most
+valuable thing the tool can tell an analyst. Report them plainly rather than hunting for a number
+to show instead. (The whole field is absent on runs from before it existed — omit the line; never
+derive it yourself.)
 
 *Fallback (Cowork/Claude Code only):* if `results` is absent, download the `.xlsx` and compute with
 `scripts/stats.py` (see REFERENCE.md).
@@ -150,12 +168,14 @@ Render, per KPI, in this order, using the **Standard visualisation style** below
    control), scaled 0–100%, with a marked **95% significance threshold** line. This visualises how
    close the test is to a reliable result. Fill colour by band (see palette): ≥95% green,
    90–95% amber, <90% grey.
-4. **Verdict badge** — "Significant (NN.N% conf)" / "Not significant" / "Underpowered" (flag any
-   variation with very few converted users — e.g. <25 — as underpowered, not a real result).
-   When not significant and `time_to_significance` is present, append the projection —
-   "Not significant — est. ~N more days at the current observed effect" — with a small footnote
-   carrying the Step 3 caveat (assumes observed rates/traffic hold, and the observed uplift is
-   itself optimistic; a rough indication, not a date).
+4. **Verdict badge** — "Significant (NN.N% conf)" / "Not significant" / **"Not testable"**.
+   Use "Not testable" whenever `not_testable_reason` is set, and put the reason itself in the
+   badge's footnote — never substitute "Not significant", which claims something different.
+   When not significant and `time_to_significance` is present, append the projection per the
+   `outcome` table in Step 3 — "Not significant — roughly N–M more days on current traffic", or
+   "may never reach significance", or "cannot resolve within N days" — with a small footnote
+   carrying the Step 3 caveat (assumes traffic holds; sized against the observed gap less one
+   standard error; an estimate, not a date).
    - **If the test is still running, the badge is a progress reading, not a decision.** Where the
      test has no agreed end point, label a crossing as "≥95% — but the test is still running"
      rather than a bare "Significant", and carry the peeking caveat from Step 3.
