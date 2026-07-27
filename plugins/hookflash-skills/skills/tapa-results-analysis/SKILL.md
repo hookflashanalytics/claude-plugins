@@ -127,23 +127,27 @@ a group, or no conversions in either group). When it is set, `confidence` and `s
 from the counts, and do not call it "not significant", which is a different statement.
 
 **Days-to-significance projection.** Read what this number *is* before reporting it. It answers
-"how long would a test need to have an 80% chance of detecting a gap this size?", sized against the
-gap measured so far. It is **not** a prediction about this test. If the real difference is smaller
-than the one measured — common, because a gap looks its biggest at the moment someone checks on it —
-it takes longer.
+"how long would a test need to have an 80% chance of resolving a gap this size, at 95% confidence?",
+sized against the gap measured so far. It is a **design requirement, not a countdown** — not a
+prediction about this test. If the real difference is smaller than the one measured — common, because
+a gap looks its biggest at the moment someone checks on it — it takes longer.
 
-So phrase it as **"~N more days if the current gap holds"**, never "significant in N days" and never
-a date. Each variation that is not yet significant carries `time_to_significance` with an `outcome`:
+Crucially, because it targets 80% power it is **about twice** the sample at which the measured gap
+would first cross 95%. So never phrase it as "if the current gap holds, significant in N days" — that
+reads as a countdown and is wrong by roughly a factor of two. Never give a date either.
 
 | `outcome` | Fields | Say |
 |---|---|---|
-| `estimate` | `days_remaining`, `users_remaining_per_arm`, `direction` | "~N more days if the current gap holds" |
-| `estimate_too_long` | same, plus `horizon_days` | "too long to be meaningful — ~N days, about M more users per arm" — **quote both figures**, they are the useful part |
+| `estimate` | `days_remaining`, `users_remaining_per_arm`, `direction` | "~N more days to resolve a gap this size, at 95% confidence and 80% power" |
+| `estimate_too_long` | same, plus `horizon_days` | "too long to be meaningful: ~N days, about M more users per arm" — **quote both figures**, they are the useful part |
 | `no_difference_yet` | — | "no difference measured yet, so there is nothing to project from" |
+
+`assumes` carries the full qualifier in the server's own words. If anyone asks how the figure was
+derived, quote it rather than paraphrasing.
 
 **Check `direction` before you word it.** The maths is sign-blind — a decline needs exactly as many
 users as an equivalent improvement — so `direction: "decline"` means the projection is time to
-**confirm a loss**, not time to a win. Say "~N days to confirm the current decline". Never let a
+**confirm a loss**, not time to a win. Say "~N days to confirm a decline this size". Never let a
 losing variation's projection read as though a win is coming.
 
 **Never phrase any of these as impossibility.** Do not say the test "cannot" reach significance or

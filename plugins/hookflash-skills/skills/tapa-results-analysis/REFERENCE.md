@@ -113,7 +113,13 @@ the false-positive rate far above 5% (with enough looks, a null test will eventu
   test already running. The object that would properly answer "will THIS test be significant by day
   X" is conditional/predictive power, reporting a probability rather than a date. That rewrite is
   recorded in ADR-0006 decision 9 as the better answer and is not built. Until it is, the only honest
-  reading is *"the time this test would need if the true effect matches what we have measured"*.
+  reading is *"the sample a test would need for an 80% chance of resolving a gap this size"*.
+
+  **It is not a countdown, and the difference is large.** Targeting 80% power makes the requirement
+  exactly `(z_α+z_β)²/z_α² = 2.043x` the sample at which the measured gap would *first* cross 95%. In
+  days *remaining* the two readings diverge by 2.4x to 6.2x, because elapsed days are subtracted from
+  both. So "if the current gap holds, significant in N days" is wrong by about a factor of two and
+  must never be said. The label the server returns names the basis for this reason.
 
   It is sized against the **observed** gap (the inherited basis). A one-standard-error haircut was
   trialled and removed: uncalibrated, and the cautious figure it produced reached the reader in 0 of
@@ -121,9 +127,13 @@ the false-positive rate far above 5% (with enough looks, a null test will eventu
   comparison always has an interval containing zero. An agreed MDE replaces the basis when supplied
   (`basis: "mde"`), but nothing requires one.
 
-  It is also optimistic for a second reason: it targets a **fixed-horizon** threshold, and under
-  anytime-valid inference the required sample rises materially. Do not quantify this; do not present
-  the date as tight.
+  **Two biases run in opposite directions and largely cancel**, which is why the figure is defensible
+  as it stands. It targets a fixed-horizon threshold, valid only at a single pre-committed look, so
+  anytime-valid inference would require materially *more*; but it is sized for 80% power rather than
+  the gap's crossing point, so it already reports 2.043x *more* than the deterministic reading.
+  Anytime-valid methods typically need ~1.5–2.5x the fixed-horizon crossing sample, the band this
+  figure already sits in. Do not present the date as tight, and do not describe the figure as simply
+  optimistic — it is conservative in one respect and optimistic in another.
 
 ### Audience mode is not a randomised experiment
 
