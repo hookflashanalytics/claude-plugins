@@ -137,9 +137,14 @@ a date. Each variation that is not yet significant carries `time_to_significance
 
 | `outcome` | Fields | Say |
 |---|---|---|
-| `estimate` | `days_remaining`, `users_remaining_per_arm` | "~N more days if the current gap holds" |
+| `estimate` | `days_remaining`, `users_remaining_per_arm`, `direction` | "~N more days if the current gap holds" |
 | `estimate_too_long` | same, plus `horizon_days` | "too long to be meaningful — ~N days, about M more users per arm" — **quote both figures**, they are the useful part |
 | `no_difference_yet` | — | "no difference measured yet, so there is nothing to project from" |
+
+**Check `direction` before you word it.** The maths is sign-blind — a decline needs exactly as many
+users as an equivalent improvement — so `direction: "decline"` means the projection is time to
+**confirm a loss**, not time to a win. Say "~N days to confirm the current decline". Never let a
+losing variation's projection read as though a win is coming.
 
 **Never phrase any of these as impossibility.** Do not say the test "cannot" reach significance or
 "will never" get there. These describe our estimate, not a limit on the experiment. A test can and
