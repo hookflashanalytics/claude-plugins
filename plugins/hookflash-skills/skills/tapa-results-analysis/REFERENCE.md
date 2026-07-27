@@ -97,18 +97,19 @@ the false-positive rate far above 5% (with enough looks, a null test will eventu
   Report the reason; never reconstruct a figure from the counts.
 - **Predicted end date** = required sample size at **power** (default 80%) and **alpha** (default
   5%), divided by current daily users. The server computes this per testable, non-significant
-  variation as `time_to_significance`, with an `outcome` of `range`, `may_never` or
-  `cannot_resolve` (see SKILL.md Step 3 for what to say for each).
+  variation as `time_to_significance`, with an `outcome` of `range`, `too_close_to_call`
+  or `estimate_too_long` (see SKILL.md Step 3 for what to say for each).
 
   It is sized against the **observed gap less one standard error**, not the observed gap itself:
   the observed uplift is inflated at exactly the moments someone looks (winner's curse), so
   projecting from it promises dates tests do not hit. A 95% interval bound cannot be used instead —
   a not-yet-significant comparison always has an interval containing zero, so it would answer
-  `may_never` every time. An agreed MDE, when one is supplied, replaces the basis entirely
+  `too_close_to_call` every time. An agreed MDE, when one is supplied, replaces the basis entirely
   (`basis: "mde"`), but nothing requires one.
 
-  It is an **estimate** and is labelled as one everywhere. `may_never` and `cannot_resolve` are
-  legitimate answers, and usually the most useful ones.
+  It is an **estimate** and is labelled as one everywhere. `too_close_to_call` and `estimate_too_long` are
+  legitimate answers, and usually the most useful ones. Neither says the experiment cannot reach
+  significance — both describe the state of the estimate, which is cautious by design.
 
 ### Audience mode is not a randomised experiment
 
