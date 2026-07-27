@@ -110,15 +110,21 @@ If `results` includes a count, use it; if it only gives users + rate, derive
 `converted_users = round(users × rate)`. For every percentage you show, you must be able to state
 the "**X of Y users**" behind it.
 
-**No verdict when the comparison is not testable.** A variation may carry
-`not_testable_reason` — a sentence explaining why no confidence figure exists (too few converted
-users, or too few non-converting users, in one of the groups). When it is set, `confidence` and
-`significant` are `null` **by design**.
+**Thin counts still get a verdict.** Where a group has very few conversions (or very few
+non-conversions), the usual formula is unreliable, so the server judges the comparison with
+**Fisher's exact test** instead. The confidence figure is still there and still valid. This matters:
+a variation so broken that 3 users convert out of 10,000 against a 5% control is overwhelmingly
+significant, and that is exactly the result a client most needs to hear — so **never dismiss a
+low-count comparison as untestable.**
 
-**Report the reason. Never fill the gap yourself** — do not compute a confidence figure from the
-counts, do not call it "not significant" (that is a different statement), and do not describe the
-variation as winning or losing. Show the rates and counts, and say the comparison cannot be tested
-yet and why. A suppressed number with a stated reason is a finding; a blank is a gap.
+Those comparisons carry `low_event_count_note`. When present, report the confidence **and** the
+caution: the arithmetic is sound, but one more conversion either way can move it. Do not bury the
+verdict, and do not treat the note as a reason to ignore the result.
+
+**`not_testable_reason` is now rare** — it means there is genuinely nothing to compare (no users in
+a group, or no conversions in either group). When it is set, `confidence` and `significant` are
+`null` **by design**. Report the reason. **Never fill the gap yourself** — do not compute a figure
+from the counts, and do not call it "not significant", which is a different statement.
 
 **Days-to-significance projection:** each variation that is not yet significant *and is testable*
 carries `time_to_significance`, whose `outcome` is one of three things. Read `outcome` first and

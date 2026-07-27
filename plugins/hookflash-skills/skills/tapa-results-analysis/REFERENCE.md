@@ -90,10 +90,14 @@ the false-positive rate far above 5% (with enough looks, a null test will eventu
   expected under a true null. Treat one KPI at the overall level as the decision; everything else,
   and every device split, is **exploratory** — report it as a signal to investigate, never as a
   finding in its own right.
-- **Validity gate.** The server suppresses the confidence figure entirely when a comparison has
-  fewer than **25 converted** or **10 non-converting** users in either group, setting
-  `not_testable_reason` instead. Below those floors the arithmetic still returns a number and that
-  number is meaningless — 1 conversion against 9 at 300 users per arm computes to 99.0% confidence.
+- **Thin counts → exact test, not a refusal.** The normal approximation needs at least 10 of each
+  outcome per arm; below that it drifts anti-conservative (2 vs 4 conversions at n=300 computes to
+  59% where the exact test says 31%). So the server switches to **Fisher's exact test**, which is
+  valid at any counts, and still returns a confidence figure. A count-based refusal was tried and
+  rejected: it suppressed 500/10,000 vs 3/10,000 — a variation that broke checkout, >99.99%
+  significant — which is the single result a client most needs. Comparisons judged this way carry
+  `low_event_count_note`; report the verdict *and* the caution.
+- **`not_testable_reason`** is now narrow: no users in a group, or no conversions in either group.
   Report the reason; never reconstruct a figure from the counts.
 - **Predicted end date** = required sample size at **power** (default 80%) and **alpha** (default
   5%), divided by current daily users. The server computes this per testable, non-significant
