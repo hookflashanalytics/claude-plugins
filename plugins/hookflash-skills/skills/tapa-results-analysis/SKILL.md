@@ -127,8 +127,8 @@ report accordingly — do not reach past it for a number:
 | `outcome` | Fields | Say |
 |---|---|---|
 | `range` | `days_remaining_optimistic`, `days_remaining_cautious`, `cautious_beyond_horizon` | "roughly N–M more days"; when `cautious_beyond_horizon` is true, "roughly N+ more days, possibly longer" |
-| `too_close_to_call` | — | "too close to call to estimate yet — the gap so far is within the margin of noise" |
-| `estimate_too_long` | `horizon_days` | "the estimated time is too long to be meaningful at the current traffic" |
+| `too_close_to_call` | `horizon_days` | "too close to call to estimate — the gap so far is within the margin of error" |
+| `estimate_too_long` | `horizon_days`, `days_remaining_optimistic` | "estimated time too long to be meaningful (over N days)" — always quote `horizon_days` so the reader knows what was hit |
 
 **Never phrase either refusal as impossibility.** Do not say the test "cannot"
 reach significance, "will never" get there, or "cannot resolve in N days". Those
@@ -144,9 +144,11 @@ curse). `basis` says which effect it used (`observed_less_one_se`, or `mde` when
 detectable effect was supplied). Say "roughly N more days on current traffic" rather than
 "significant in N days".
 
-`too_close_to_call` and `estimate_too_long` are **useful answers, not failures** — they are often
-the most valuable thing the tool can tell an analyst. Report them plainly rather than hunting for a
-number to show instead. (The whole field is absent on runs from before it existed — omit the line;
+`too_close_to_call` and `estimate_too_long` are **useful answers, not failures** — often the most
+valuable thing the tool can say. Report them plainly rather than hunting for a number to show
+instead. Most in-flight tests land on one of them (measured: ~83% of projections), which is expected
+— an early or low-powered test genuinely cannot be projected. **But never report a bare refusal:
+always carry the condition or threshold it hit**, so it reads as an attempt rather than a shrug. (The whole field is absent on runs from before it existed — omit the line;
 never derive it yourself.)
 
 *Fallback (Cowork/Claude Code only):* if `results` is absent, download the `.xlsx` and compute with
@@ -180,7 +182,8 @@ Render, per KPI, in this order, using the **Standard visualisation style** below
    badge's footnote — never substitute "Not significant", which claims something different.
    When not significant and `time_to_significance` is present, append the projection per the
    `outcome` table in Step 3 — "Not significant — roughly N–M more days on current traffic", or
-   "too close to call to estimate yet", or "estimated time too long to be meaningful" — with a footnote
+   "too close to call to estimate", or "estimated time too long to be meaningful (over N days)" —
+   with a footnote
    carrying the Step 3 caveat (assumes traffic holds; sized against the observed gap less one
    standard error; an estimate, not a date).
    - **If the test is still running, the badge is a progress reading, not a decision.** Where the
