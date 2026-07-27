@@ -110,16 +110,16 @@ If `results` includes a count, use it; if it only gives users + rate, derive
 `converted_users = round(users × rate)`. For every percentage you show, you must be able to state
 the "**X of Y users**" behind it.
 
-**Thin counts still get a verdict.** Where a group has very few conversions (or very few
-non-conversions), the usual formula is unreliable, so the server judges the comparison with
-**Fisher's exact test** instead. The confidence figure is still there and still valid. This matters:
-a variation so broken that 3 users convert out of 10,000 against a 5% control is overwhelmingly
-significant, and that is exactly the result a client most needs to hear — so **never dismiss a
-low-count comparison as untestable.**
+**Thin counts still get a verdict, from the same formula.** Small conversion counts never suppress
+the confidence figure. A variation so broken that 3 users convert out of 10,000 against a 5% control
+is overwhelmingly significant, and the formula says so — that is exactly the result a client most
+needs to hear, so **never dismiss a low-count comparison as untestable.**
 
-Those comparisons carry `low_event_count_note`. When present, report the confidence **and** the
-caution: the arithmetic is sound, but one more conversion either way can move it. Do not bury the
-verdict, and do not treat the note as a reason to ignore the result.
+Those comparisons carry `low_event_count_note`, which flags the verdict as fragile and quotes an
+exact-test cross-check figure. When present, report the confidence **and** the caution: one more
+event either way can move it, and at these counts the formula tends to read a little high. Do not
+bury the verdict, do not swap in the cross-check figure as the headline, and do not treat the note as
+a reason to ignore the result.
 
 **`not_testable_reason` is now rare** — it means there is genuinely nothing to compare (no users in
 a group, or no conversions in either group). When it is set, `confidence` and `significant` are

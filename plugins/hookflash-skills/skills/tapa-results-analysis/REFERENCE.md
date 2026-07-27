@@ -90,13 +90,17 @@ the false-positive rate far above 5% (with enough looks, a null test will eventu
   expected under a true null. Treat one KPI at the overall level as the decision; everything else,
   and every device split, is **exploratory** — report it as a signal to investigate, never as a
   finding in its own right.
-- **Thin counts → exact test, not a refusal.** The normal approximation needs at least 10 of each
-  outcome per arm; below that it drifts anti-conservative (2 vs 4 conversions at n=300 computes to
-  59% where the exact test says 31%). So the server switches to **Fisher's exact test**, which is
-  valid at any counts, and still returns a confidence figure. A count-based refusal was tried and
-  rejected: it suppressed 500/10,000 vs 3/10,000 — a variation that broke checkout, >99.99%
-  significant — which is the single result a client most needs. Comparisons judged this way carry
-  `low_event_count_note`; report the verdict *and* the caution.
+- **The formula is inherited and fixed.** Hookflash inherited this calculation from its Head of CRO
+  and its continuity is a requirement — the server reports it at every count, and the workbook keeps
+  the live `TDIST` formula on every row. Two changes were trialled and reverted: a count-based gate
+  (a false-negative machine — it suppressed 500/10,000 vs 3/10,000, a broken variation the formula
+  correctly calls at 100%) and a switch to Fisher's exact test on thin counts (defensible, but it
+  moves an inherited number). See ADR-0006 decision 5.
+- **Thin counts are flagged, not recalculated.** Below 10 of either outcome in either arm the formula
+  reads anti-conservatively — measured over 3,570 scenarios, up to 68 pp high, with 176 cases where
+  it says ≥95% and an exact test does not, and none in the reverse direction. Those comparisons carry
+  `low_event_count_note`, which quotes the exact-test figure as a cross-check. Report the verdict
+  *and* the caution; never substitute the cross-check for the headline figure.
 - **`not_testable_reason`** is now narrow: no users in a group, or no conversions in either group.
   Report the reason; never reconstruct a figure from the counts.
 - **Predicted end date** = required sample size at **power** (default 80%) and **alpha** (default
