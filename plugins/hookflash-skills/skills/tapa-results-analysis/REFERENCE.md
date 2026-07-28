@@ -47,15 +47,100 @@ Feed that dict to `scripts/stats.py`. If a field is missing, say so rather than 
 
 ## Statistics (scripts/stats.py)
 
+### What "Confidence" means — read before reporting any number
+
+Confidence is `1 − p` from a two-sided two-proportion test. **`p` is the probability of seeing a
+gap at least this big IF the variation and control were truly identical.** So:
+
+> **Confidence is the confidence that a gap this size is not luck.**
+
+It is **not** the probability the variation is better, not the probability the variation wins, and
+not the chance the result "is real". Those are Bayesian posterior quantities and this tool does not
+compute them — asserting them is the transposed-conditional fallacy. Use the wording above verbatim
+when you have to explain the number.
+
+### The peeking caveat — state this whenever a test is still running
+
+A confidence figure is only valid **at a sample size committed to before the test started**.
+Checking repeatedly and stopping when the number crosses 95% is *optional stopping*: it inflates
+the false-positive rate far above 5% (with enough looks, a null test will eventually cross).
+
+- **Never present a mid-flight crossing of 95% as a result.** If the test has not reached its
+  planned horizon, report the uplift and the confidence as a progress reading, not a verdict.
+- The tool encourages repeated evaluation (scheduled re-runs, a days-to-significance countdown).
+  That convenience does not make the mid-flight number a decision.
+
+### The numbers
+
 - **Conversion rate** = converted users / users per variation.
 - **Uplift** = variation_rate / control_rate − 1 (report as %).
-- **Significance** = two-proportion z-test → p-value → confidence = 1 − p. Flag **significant**
-  at the test's threshold (default 95%). Below threshold = **not significant**; very few
-  converted users = **underpowered** (call it out).
-- **Predicted end date** = required sample size for the target **MDE** at **power** (default 80%)
-  and **alpha** (default 5%), minus users so far, divided by current daily users → days remaining.
-  The server computes this per non-significant variation as `time_to_significance` in the results
-  JSON (observed uplift as the MDE) — prefer that field over recomputing here.
+- **Significance** = two-proportion test → p-value → confidence = 1 − p. Flag **significant** at
+  the test's threshold (default 95%) *only when the planned sample size has been reached*. Below
+  threshold = **not significant**; very few converted users = **underpowered** (call it out).
+  - The server uses an **unpooled** standard error (the confidence-interval form) rather than
+    pooling under the null. This is a deliberate choice — it matches Optimizely's fixed-horizon
+    frequentist mode and Minitab's default — and it moves the confidence figure by under
+    0.02 percentage points on realistic inputs.
+  - **Known inconsistency:** `scripts/stats.py` currently computes the **pooled** z-test, so this
+    fallback can differ from the server in the last decimal place. Prefer the server's `results`
+    object. (Reconciliation is tracked as a follow-up.)
+- **Multiple comparisons — uncorrected.** One run tests every KPI × 4 device splits × every
+  variation, each at α = 0.05, with **no correction applied**. Eight KPIs against one variation is
+  32 tests, at which point roughly a 4-in-5 chance of at least one spurious "significant" result is
+  expected under a true null. Treat one KPI at the overall level as the decision; everything else,
+  and every device split, is **exploratory** — report it as a signal to investigate, never as a
+  finding in its own right.
+- **The formula is inherited and fixed.** Hookflash inherited this calculation from its Head of CRO
+  and its continuity is a requirement — the server reports it at every count, and the workbook keeps
+  the live `TDIST` formula on every row. Two changes were trialled and reverted: a count-based gate
+  (a false-negative machine — it suppressed 500/10,000 vs 3/10,000, a broken variation the formula
+  correctly calls at 100%) and a switch to Fisher's exact test on thin counts (defensible, but it
+  moves an inherited number). See ADR-0006 decision 5.
+- **Thin counts are flagged, not recalculated.** Below 10 of either outcome in either arm the formula
+  reads anti-conservatively — measured over 3,570 scenarios, up to 68 pp high, with 176 cases where
+  it says ≥95% and an exact test does not, and none in the reverse direction. Those comparisons carry
+  `low_event_count_note`, which quotes the exact-test figure as a cross-check. Report the verdict
+  *and* the caution; never substitute the cross-check for the headline figure.
+- **`not_testable_reason`** is now narrow: no users in a group, or no conversions in either group.
+  Report the reason; never reconstruct a figure from the counts.
+- **Days to 95%.** `n = V·z_α²/d²` per arm (where `V` = the two arms' `p(1−p)` summed), divided by the
+  daily users of the **slower arm**, minus days elapsed. This is the significance test solved for `n`
+  instead of for confidence: feed that `n` back in at the same rates and it returns exactly 95.0000%,
+  so the countdown and the confidence column cannot drift apart. The server returns it as
+  `time_to_significance` with an `outcome` of `estimate`, `estimate_too_long` or `no_difference_yet`
+  (SKILL.md Step 3 has the wording for each).
+
+  **It is a central estimate, not a bound.** At the quoted day the test crosses 95% *if the gap is
+  still the size it is now*. The gap moves as data arrives and shrinks more often than it grows — a
+  gap looks its biggest at the moment someone checks on it — so arriving later is the likelier miss.
+  Replacing the estimate with a probability (conditional/predictive power) is recorded in ADR-0006
+  decision 9 as a possible future, not needed for this.
+
+  **Not the same as the workbook's hidden `Sample Size` column.** That is the 80%-power *design*
+  sample size, `2V'(z_α+z_β)²/d²`, exactly `(z_α+z_β)²/z_α² = 2.043x` larger, and it answers "how big
+  should a NEW test be?". The countdown used to be sized with it, which overstated the wait by ~2x
+  (2.4x–6.2x in days *remaining*, since elapsed days come off both) and made tests 8 days from
+  resolving read as 30. Never quote the design figure as the countdown.
+
+  It is sized against the **observed** gap (the inherited basis). A one-standard-error haircut was
+  trialled and removed: uncalibrated, and the cautious figure it produced reached the reader in 0 of
+  246 measured scenarios. A 95% interval bound cannot be used instead — a not-yet-significant
+  comparison always has an interval containing zero. An agreed MDE replaces the basis when supplied
+  (`basis: "mde"`), but nothing requires one.
+
+  **It is sized against a fixed-horizon threshold**, which is only valid at a single pre-committed
+  look. Under anytime-valid inference the required sample rises materially, so the estimate is
+  optimistic in that respect on top of the winner's-curse lean. Do not present it as tight.
+
+### Audience mode is not a randomised experiment
+
+`tapa_ra_generate_audience_excel` compares arbitrary GA4 audiences. When those audiences are the
+variation audiences of a real A/B test, users were randomised and causal language is fair. When
+they are any other audience (returning vs new, mobile vs desktop, a behavioural segment), **users
+selected themselves into the groups**. The arithmetic still runs and still prints a confidence
+figure, but it carries no causal meaning: the groups differ in every way that made them different
+audiences, not just in the thing being compared. Report those as **descriptive comparisons** and do
+not claim one audience "caused" or "drove" the difference.
 
 ## Out of scope
 

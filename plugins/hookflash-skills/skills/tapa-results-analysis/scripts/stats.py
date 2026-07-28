@@ -9,6 +9,23 @@ The "conversions" inputs hold CONVERTED USERS (GA4 activeUsers who fired the
 KPI event at least once), matching the workbook's "Converted Users" columns —
 label them "converted users" in any output.
 
+READING THE `confidence` FIELD: it is 1 - p from a two-sided test, i.e. the
+CONFIDENCE THAT A GAP THIS SIZE IS NOT LUCK. It is NOT the probability the
+variation is better and NOT the chance the result "is real" — those are
+Bayesian posteriors this module does not compute.
+
+Two caveats that apply to every number below:
+  * These are FIXED-HORIZON statistics. They are only a verdict at a sample
+    size committed to before the test started. Checking repeatedly and calling
+    it at the first 95% crossing inflates the false-positive rate well past 5%.
+  * `compare_variations` applies NO multiple-comparison correction. Running it
+    across many KPIs and device splits makes a spurious "significant" likely.
+
+KNOWN INCONSISTENCY: `two_proportion_z` below pools under the null, while the
+Tapa server uses an unpooled standard error. The two agree to within ~0.02
+percentage points of confidence on realistic inputs, but prefer the server's
+`results` object when it is available.
+
 Usage:
     from stats import compare_variations, predicted_end_date
     res = compare_variations(control={"users":5162,"conversions":1859},
@@ -64,7 +81,10 @@ def rate(users: int, conversions: int) -> float:
 
 def two_proportion_z(control: dict, variation: dict) -> dict:
     """Two-proportion z-test on conversion rate. Returns z, p_value (two-tailed),
-    confidence (1 - p), and the pooled standard error."""
+    confidence (1 - p), and the pooled standard error.
+
+    `confidence` = confidence that a gap this size is not luck. NOT the
+    probability the variation is better. See the module docstring."""
     n1, x1 = control["users"], control["conversions"]
     n2, x2 = variation["users"], variation["conversions"]
     p1, p2 = rate(n1, x1), rate(n2, x2)
@@ -116,7 +136,12 @@ def required_sample_size(baseline_rate: float, mde: float,
 def predicted_end_date(baseline_rate: float, users_so_far: int, days_elapsed: int,
                        mde: float, power: float = 0.80, alpha: float = 0.05) -> dict:
     """Days remaining until each arm reaches the required sample size, at the
-    current daily user rate. Returns per-arm target, users_so_far, days_remaining."""
+    current daily user rate. Returns per-arm target, users_so_far, days_remaining.
+
+    Pass the PRE-AGREED MDE. Passing the observed uplift instead makes the
+    projection biased optimistic: a variation looks best at exactly the moments
+    someone checks on it (winner's curse), so the resulting date is a floor the
+    test may never actually reach."""
     need_per_arm = required_sample_size(baseline_rate, mde, power, alpha)
     daily = (users_so_far / days_elapsed) if days_elapsed else 0
     remaining_users = max(0, need_per_arm - users_so_far)
