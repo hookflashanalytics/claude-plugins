@@ -50,7 +50,12 @@ the page HTML, and say fidelity is best-effort.
 
 1. Open the URL in a fresh tab. **Lock the viewport** (1280×900 desktop or
    375×812 mobile) before capturing; don't resize mid-run.
-2. Take a **full-page screenshot** — this is the "before" and your reference.
+2. Take a **full-page screenshot** — this is the "before" and your
+   reference. First scroll to the bottom in steps and back (settles
+   lazy-loaded content), then capture in ONE shot: read
+   `document.documentElement.scrollHeight`, resize the window to
+   `(width, scrollHeight)`, screenshot once, resize back. Never stitch
+   viewport tiles into the deliverable — seams and misalignment follow.
 3. Read the real design facts for the region you'll rebuild: computed styles
    (font family/size/weight, colours, spacing), exact copy, and image URLs.
    `getBoundingClientRect()` + `getComputedStyle()` via the JS tool beat
