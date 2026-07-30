@@ -18,9 +18,13 @@ testing before submission; never block on it.
 
 - **Notion connector required** to file the row. If this session has no Notion tools,
   skip to **No-Notion fallback** below — never claim a row was created when it wasn't.
-- Target: the **Suggest a skill** database in the AI Ops hub —
-  page `https://app.notion.com/p/5d84a8b44163453ca18757436d917950`,
-  data source `collection://0cccdf72-2485-4ab7-8efe-2ef3c9dc8fd7`.
+- Two databases in the AI Ops hub, both needed:
+  - **Suggest a skill** (where you file the row) — page
+    `https://app.notion.com/p/5d84a8b44163453ca18757436d917950`,
+    data source `collection://0cccdf72-2485-4ab7-8efe-2ef3c9dc8fd7`.
+  - **Skill catalog** (what already exists — read in Step 2) — page
+    `https://app.notion.com/p/18e85f3d24fb4ab3843eb31656de94d6`,
+    data source `collection://ccc768ae-2b02-4b79-86e1-4146178873e0`.
 
 ## Step 1 — Route, and gather the one-liners
 
@@ -41,21 +45,29 @@ them it's the fast lane at review).
 
 ## Step 2 — Overlap check (before drafting)
 
-Compare the idea against the skills that already exist. **The session's installed skills
-are not the full list** — most Hookflash skills live in the staging channel
-(`hookflash-skills-staging`), which only nominated testers have installed. So check both:
+**Query the Skill catalog — do not judge overlap from the skills installed in this session.**
+The catalog is the one complete list: it covers both release channels (*Live* = everyone has
+it, *Staging* = testers only). The session's installed skills are a subset — usually just the
+certified ones — so checking those would wave through a duplicate of a staging skill.
 
-1. The `hookflash-skills` and `hookflash-skills-staging` names and descriptions available
-   in this session, and
-2. The **Skill catalog** in the Notion AI Ops hub, which lists both channels — this is the
-   only complete view when staging isn't installed. Say so if you can't reach Notion:
-   "I can only see the skills installed here, so a staging skill may already cover this."
+```sql
+SELECT "Skill", "Status", "What it does"
+FROM "collection://ccc768ae-2b02-4b79-86e1-4146178873e0"
+WHERE "Status" != 'Retired'
+```
 
-- **Overlap or a tweak of an existing skill** → name the existing skill and explain the
-  house rule: preference tweaks stay personal; improvements belong to the canonical skill.
-  Offer to reframe the suggestion as "Improve <existing-skill>: …". If they still want a
-  new skill filed, continue — the reviewer decides; you only set expectations.
+Then compare the idea against those names and descriptions:
+
+- **Overlap or a tweak of an existing skill** → name the existing skill, say which channel
+  it's in, and explain the house rule: preference tweaks stay personal; improvements belong to
+  the canonical skill. Offer to reframe the suggestion as "Improve <existing-skill>: …". If
+  they still want a new skill filed, continue — the reviewer decides; you only set expectations.
+  - If the match is *Staging*, add: "that one exists but is still in testing — ask Connor if
+    you want early access rather than a new skill."
 - **No overlap** → proceed.
+- **Catalog unreachable** → say so plainly ("I couldn't read the Skill catalog, so I can't rule
+  out a duplicate — the reviewer will check") and continue. Never silently fall back to the
+  installed-skills list and present it as a complete check.
 
 ## Step 3 — Draft the complete skill file (when none exists)
 
