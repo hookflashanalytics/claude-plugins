@@ -38,19 +38,36 @@ depends on it. If the page can't be reached (login/geo/bot wall), ask for a
 full-page screenshot instead and audit that (skip the live-measurement parts
 below).
 
-## Step 1 — Capture
+## Step 1 — Capture (one seamless image per viewport, exact coordinates)
 
 Use whichever browser tools are connected (Cowork/Claude Code browser pane,
-or Claude in Chrome).
+or Claude in Chrome). Run this whole procedure twice: **desktop at 1280
+wide, then mobile at 375 wide.** Both always — half the findings only exist
+on one of them.
 
 1. Fresh tab, navigate, dismiss/decline any consent banner (most
    privacy-preserving option), confirm the page loaded properly.
-2. **Desktop pass:** lock viewport to 1280×900, full-page screenshot.
-3. **Mobile pass:** resize to 375×812, reload, full-page screenshot. Both
-   passes always — half the findings only exist on one of them.
-4. While live, record each candidate problem element's
-   `getBoundingClientRect()` box (per viewport) — you need real coordinates
-   for the highlights, not eyeballed ones.
+2. **Settle the page before measuring anything:** scroll to the bottom in
+   viewport-sized steps (triggers lazy-loaded images and modules), wait for
+   the network to go quiet, scroll back to top. Element positions recorded
+   before lazy-load settles are wrong by the height of everything that
+   loaded in — this is the #1 cause of misplaced highlights.
+3. **Capture in ONE shot, not tiles.** Read
+   `document.documentElement.scrollHeight`, then resize the window to
+   `(width, scrollHeight)` and take a single screenshot — the whole page in
+   one seamless image, no stitching. Then resize back. Only if the tool
+   refuses a viewport that tall, fall back to tiling — and then the tiles
+   MUST be merged into one image before the HTML is built (see Step 3);
+   when tiling: disable smooth scrolling, hide `position:fixed`/`sticky`
+   elements after the first tile (or they repeat in every tile), scroll,
+   and record the **actual** `window.scrollY` after each scroll — never
+   assume it landed where you asked.
+4. **Record coordinates in document space, in the same settled state:** for
+   each candidate problem element,
+   `getBoundingClientRect()` + `window.scrollY`, alongside the
+   `scrollHeight` and viewport width they were measured at. These three
+   numbers must come from the same page state as the screenshot — remeasure
+   if anything reflowed. Never eyeball coordinates from the screenshot.
 
 ## Step 2 — Audit
 
@@ -84,21 +101,38 @@ mockable edit ("move X above Y", "rewrite headline to lead with Z").
 Severity is about the **page goal**: a Low-contrast footnote is Low; a
 primary CTA below the fold on mobile is High.
 
+**Never claim something is absent without asking the DOM.** Before writing
+any finding of the form "there is no X" or "nothing here does Y" (no H1, no
+CTA, nothing clickable in the hero, no reviews), run the query that would
+find it — `document.querySelector('h1')`,
+`heroEl.querySelectorAll('a,button,[role=button]')`, and so on. If the
+element exists but is weak, the finding is "too small / too faint / too
+buried", stated with its measured size or contrast — not "missing". One
+finding disproved by a one-line DOM query costs the whole audit its
+credibility.
+
 ## Step 3 — Build the annotated pages (the page IS the deliverable)
 
 Build **one self-contained `.html` file per viewport** (desktop and mobile).
 Each file is the user's page, annotated — not a report *about* the page:
 
-- **The full-page screenshot IS the page body.** Embed it as a data URI in
-  an `<img>` with `display:block; width:100%`, wrapped in a
-  `position:relative` div. **Never put the screenshot inside a fixed-size
-  panel, card, or frame** — no borders, no padding, no max-height, no white
-  letterboxing around it. If any background is visible beside or below the
-  screenshot, the layout is wrong: the image alone defines the page height.
-- **Highlight boxes are positioned in percentages** of the screenshot's
-  natural dimensions (`left = x/imgWidth*100%`, same for top/width/height),
-  so they stay glued to their elements at any window size. Draw them from
-  the recorded `getBoundingClientRect()` values — never eyeballed. Border
+- **Exactly ONE `<img>` per file, and it IS the page body.** Embed the
+  full-page screenshot as a data URI in an `<img>` with
+  `display:block; width:100%`, wrapped in a `position:relative` div. If
+  capture had to tile, merge the tiles into a single image FIRST (offscreen
+  `<canvas>` drawn at the recorded scrollY offsets, exported once) — never
+  stack multiple `<img>` tiles with aspect-ratio boxes or negative-margin
+  crops in the deliverable; that is where seams and drift come from.
+- **The desktop file fills the whole browser width.** No `max-width`, no
+  centring, no visible page background beside the screenshot at any window
+  size — the image scales with the window. (Only the mobile file is a
+  centred phone-width column, per below.)
+- **Highlight boxes are positioned in percentages of the document CSS
+  size** you recorded at capture: `left = x / viewportWidth * 100%`,
+  `top = (rect.top + scrollY) / scrollHeight * 100%`, same for
+  width/height. Because both the boxes and the image scale together,
+  device-pixel-ratio and window size drop out — but ONLY if all numbers
+  came from the same settled page state. Never eyeball coordinates. Border
   colour by severity (red/amber/yellow), a small severity-coloured number
   badge on the corner, nothing that obscures the content being criticised.
 - **The finding lives in a tooltip, not a legend.** On hover (desktop) and
@@ -122,11 +156,19 @@ available in the session, fall back to sending the two `.html` files and
 opening the desktop one in the browser pane.
 
 **Verify the published links, not just the files (ADR-0006):** open each
-link, screenshot it, and check: no white gutters or empty panels around the
-screenshot; every numbered box sits on the element its finding describes (a
-mislabelled highlight is worse than none); tooltips appear on hover and on
-tap and don't clip at the edges. Fix and republish until right (at most
-three rounds).
+link and check, in order:
+
+1. **Full-bleed:** at a wide window (~1900px) the desktop screenshot spans
+   edge to edge — no gutters beside it, no gaps or repeated
+   headers/banners inside it (stitching artefacts).
+2. **Every box, individually:** zoom into each numbered box and confirm the
+   element its finding describes sits inside it. If boxes are all offset
+   the same way, the total-height or scrollY numbers are stale — remeasure
+   and rebuild; do not nudge boxes by hand to compensate. A mislabelled
+   highlight is worse than none.
+3. **Tooltips:** appear on hover and on tap, don't clip at the edges.
+
+Fix and republish until right (at most three rounds).
 
 ## Step 4 — Report
 
