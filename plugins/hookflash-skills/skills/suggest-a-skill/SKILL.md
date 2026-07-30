@@ -41,8 +41,15 @@ them it's the fast lane at review).
 
 ## Step 2 — Overlap check (before drafting)
 
-Compare the idea against the certified skills already installed from this plugin (the
-hookflash-skills names and descriptions available in this session).
+Compare the idea against the skills that already exist. **The session's installed skills
+are not the full list** — most Hookflash skills live in the staging channel
+(`hookflash-skills-staging`), which only nominated testers have installed. So check both:
+
+1. The `hookflash-skills` and `hookflash-skills-staging` names and descriptions available
+   in this session, and
+2. The **Skill catalog** in the Notion AI Ops hub, which lists both channels — this is the
+   only complete view when staging isn't installed. Say so if you can't reach Notion:
+   "I can only see the skills installed here, so a staging skill may already cover this."
 
 - **Overlap or a tweak of an existing skill** → name the existing skill and explain the
   house rule: preference tweaks stay personal; improvements belong to the canonical skill.
