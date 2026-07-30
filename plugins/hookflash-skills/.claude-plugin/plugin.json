@@ -1,6 +1,6 @@
 {
   "name": "hookflash-skills",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "description": "Certified Hookflash skills, plus the Tether MCP connection all Hookflash skills depend on",
   "author": {
     "name": "Hookflash AI Ops"
