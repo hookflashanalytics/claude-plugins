@@ -54,8 +54,13 @@ the page HTML, and say fidelity is best-effort.
    reference. First scroll to the bottom in steps and back (settles
    lazy-loaded content), then capture in ONE shot: read
    `document.documentElement.scrollHeight`, resize the window to
-   `(width, scrollHeight)`, screenshot once, resize back. Never stitch
-   viewport tiles into the deliverable — seams and misalignment follow.
+   `(width, scrollHeight)`, screenshot once, resize back — and check the
+   image's height ÷ width matches `scrollHeight ÷ viewportWidth` (browser
+   panes silently clamp tall viewports; if the ratio is off the shot is
+   partial). If clamped, capture viewport tiles at recorded `scrollY`
+   offsets and merge them into ONE image with an image tool (paste at
+   `scrollY × devicePixelRatio`) — never stitch tiles in the deliverable's
+   HTML/CSS; seams and misalignment follow.
 3. Read the real design facts for the region you'll rebuild: computed styles
    (font family/size/weight, colours, spacing), exact copy, and image URLs.
    `getBoundingClientRect()` + `getComputedStyle()` via the JS tool beat

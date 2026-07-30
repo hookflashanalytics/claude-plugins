@@ -2,10 +2,10 @@
 name: hypothesis-ux-audit
 description: >-
   Audit a live page against UX / CRO best practice and hand back two web-page
-  links (desktop view + mobile view) showing the user's own page full-bleed
-  with the problem areas highlighted — hover or tap a numbered box to see the
-  finding, severity and recommended change — then an offer to turn chosen
-  fixes into a mockup via /hypothesis-mock-up. Use when the user runs /hypothesis-ux-audit, asks for a
+  links (desktop view + mobile view) showing the user's own page with the
+  problem areas highlighted — hover or tap a numbered box to see the finding,
+  severity and recommended change — then an offer to turn chosen fixes into a
+  mockup via /hypothesis-mock-up. Use when the user runs /hypothesis-ux-audit, asks for a
   UX audit / CRO audit / heuristic review of a page, asks "what's wrong with
   this page" or "why isn't this page converting", or wants test-hypothesis
   ideas for a specific URL. Input is just a URL (or a screenshot if the page
@@ -17,9 +17,9 @@ description: >-
 
 You audit **one page** against UX / CRO best practice and hand back a tight
 findings list plus **two links — desktop and mobile — to the page itself
-with the problem areas highlighted**: the full-page screenshot rendered
-full-bleed as a web page, where hovering or tapping a numbered box reveals
-the finding, its severity and the recommended change. Every finding is a
+with the problem areas highlighted**: the full-page screenshot rendered as a
+web page at true size, where hovering or tapping a numbered box reveals the
+finding, its severity and the recommended change. Every finding is a
 candidate test hypothesis; the skill ends by offering to mock the fixes up.
 
 **Only flag what you can see.** Every finding must point at observable
@@ -52,17 +52,30 @@ on one of them.
    the network to go quiet, scroll back to top. Element positions recorded
    before lazy-load settles are wrong by the height of everything that
    loaded in — this is the #1 cause of misplaced highlights.
-3. **Capture in ONE shot, not tiles.** Read
-   `document.documentElement.scrollHeight`, then resize the window to
-   `(width, scrollHeight)` and take a single screenshot — the whole page in
-   one seamless image, no stitching. Then resize back. Only if the tool
-   refuses a viewport that tall, fall back to tiling — and then the tiles
-   MUST be merged into one image before the HTML is built (see Step 3);
-   when tiling: disable smooth scrolling, hide `position:fixed`/`sticky`
-   elements after the first tile (or they repeat in every tile), scroll,
-   and record the **actual** `window.scrollY` after each scroll — never
-   assume it landed where you asked.
-4. **Record coordinates in document space, in the same settled state:** for
+3. **Try a single full-page shot first:** read
+   `document.documentElement.scrollHeight`, resize the window to
+   `(width, scrollHeight)`, screenshot once, resize back. **Then prove it
+   worked:** the saved image's height ÷ width must equal
+   `scrollHeight ÷ viewportWidth` within 2%. Browser panes often silently
+   clamp tall viewports — if the ratio is off, the shot is partial:
+   discard it and tile-and-merge instead. Never patch a partial shot with
+   CSS.
+4. **Tile-and-merge** (the expected path when tall viewports are clamped).
+   The merge happens in an image tool BEFORE the HTML exists — the
+   deliverable never sees tiles:
+   - Disable smooth scrolling; hide `position:fixed`/`sticky` elements
+     after the first tile (or they repeat in every tile).
+   - Scroll one viewport at a time; after each scroll read the **actual**
+     `window.scrollY` (never assume it landed where you asked) and keep
+     tile → scrollY pairs.
+   - Screenshots come out larger than CSS pixels (devicePixelRatio,
+     usually 1.5–2×). Compute `s = tileImageWidth ÷ viewportCssWidth`,
+     make a canvas of `tileImageWidth × round(scrollHeight × s)`
+     (Python/PIL in the session, or an offscreen canvas), and paste each
+     tile at `y = round(scrollY × s)`. Exact offsets make overlaps
+     invisible — no guessed percentages anywhere.
+   - Run the same ratio check as step 3 on the merged file.
+5. **Record coordinates in document space, in the same settled state:** for
    each candidate problem element,
    `getBoundingClientRect()` + `window.scrollY`, alongside the
    `scrollHeight` and viewport width they were measured at. These three
@@ -116,17 +129,22 @@ credibility.
 Build **one self-contained `.html` file per viewport** (desktop and mobile).
 Each file is the user's page, annotated — not a report *about* the page:
 
-- **Exactly ONE `<img>` per file, and it IS the page body.** Embed the
-  full-page screenshot as a data URI in an `<img>` with
-  `display:block; width:100%`, wrapped in a `position:relative` div. If
-  capture had to tile, merge the tiles into a single image FIRST (offscreen
-  `<canvas>` drawn at the recorded scrollY offsets, exported once) — never
-  stack multiple `<img>` tiles with aspect-ratio boxes or negative-margin
-  crops in the deliverable; that is where seams and drift come from.
-- **The desktop file fills the whole browser width.** No `max-width`, no
-  centring, no visible page background beside the screenshot at any window
-  size — the image scales with the window. (Only the mobile file is a
-  centred phone-width column, per below.)
+- **Exactly ONE `<img>` per file** — the merged full-page screenshot from
+  Step 1, embedded as a data URI, `display:block; width:100%` of its
+  column, wrapped in a `position:relative` div. The deliverable never
+  contains tiles: no stacked images, no aspect-ratio boxes, no
+  negative-margin crops.
+- **Show the image whole and never enlarged.** The `<img>` width is always
+  exactly 100% of its column — never more (an oversized width like `190%`
+  plus `overflow:hidden` crops the page off-screen; this class of hack is
+  banned). devicePixelRatio only makes the file sharper, it is handled by
+  downscaling, never by cropping.
+- **The desktop screenshot sits in a centred column, ~60% of the window
+  width**, on a plain dark background, and additionally never wider than
+  the capture's CSS width (`width:60vw; max-width:1280px; margin:0 auto` —
+  the max-width stops the image rendering bigger than the real site, which
+  reads as "zoomed in"). The column holds the image alone: no card, no
+  border, no padding, nothing above or below it but the header bar.
 - **Highlight boxes are positioned in percentages of the document CSS
   size** you recorded at capture: `left = x / viewportWidth * 100%`,
   `top = (rect.top + scrollY) / scrollHeight * 100%`, same for
@@ -158,9 +176,12 @@ opening the desktop one in the browser pane.
 **Verify the published links, not just the files (ADR-0006):** open each
 link and check, in order:
 
-1. **Full-bleed:** at a wide window (~1900px) the desktop screenshot spans
-   edge to edge — no gutters beside it, no gaps or repeated
-   headers/banners inside it (stitching artefacts).
+1. **The page looks like the real site, not a zoom or a crop:** compare
+   the rendered top of the page against the live site at the same window
+   size — text and elements the same visual size (not blown up), nothing
+   cut off at the left or right edge, the full page top-to-bottom in one
+   piece with no seams, gaps, or repeated headers/banners (merge
+   artefacts). The desktop column sits centred at ~60% of the window.
 2. **Every box, individually:** zoom into each numbered box and confirm the
    element its finding describes sits inside it. If boxes are all offset
    the same way, the total-height or scrollY numbers are stale — remeasure
