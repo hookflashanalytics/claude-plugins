@@ -1,13 +1,13 @@
 ---
 name: pull-crawl
-description: Pull a domain's most recent NIGHTLY crawl from Tapa's monitoring pipeline via the Tether MCP — a styled workbook (Summary + every crawled page + 30-day crawl-health Trends), a deep link into the Tapa Crawler Dashboard, and AI insights written by Claude into the workbook's Summary tab. Use when the user runs /pull-crawl, asks for "last night's crawl", "the latest crawl of X", or wants the stored nightly crawl data for a site. This PULLS data already collected each night — to crawl a site fresh right now, use tapa-site-crawler instead.
+description: Pull a domain's most recent NIGHTLY crawl from Tapa's monitoring pipeline via the Tether MCP — a styled workbook (Summary + every crawled page + a 30-day crawl-health Trends tab of charts), a deep link into the Tapa Crawler Dashboard, and AI insights delivered by Claude in chat. Use when the user runs /pull-crawl, asks for "last night's crawl", "the latest crawl of X", or wants the stored nightly crawl data for a site. This PULLS data already collected each night — to crawl a site fresh right now, use tapa-site-crawler instead.
 ---
 
 # Pull Crawl (nightly)
 
 Turn one domain into its latest nightly crawl report: a workbook with the full
-crawl, a 30-day crawl-health trend, a Summary tab whose AI-insights box YOU
-fill in, plus an in-chat visualisation and a dashboard deep link.
+crawl and a 30-day crawl-health Trends tab of charts, plus an in-chat
+visualisation, YOUR insights in chat, and a dashboard deep link.
 
 ## Prerequisites (read first)
 
@@ -23,8 +23,7 @@ fill in, plus an in-chat visualisation and a dashboard deep link.
   and explain they need to sign in there to authenticate the app, then retry.
 - Tools under the Tether MCP: `tapa_nr_options`, `tapa_nr_run`. (No upload tool — the input is
   just a domain. Synchronous — no polling, no job_id.)
-- **Works in normal claude.ai chat** (the insights-into-workbook step needs file handling — see
-  Step 5).
+- **Works in normal claude.ai chat.**
 
 ## Step 1 — Gather the inputs (ask, don't guess)
 
@@ -57,27 +56,20 @@ CSS + inline SVG only, no external resources). Charts are real data charts from 
 ## Step 4 — The workbook link and the dashboard link
 
 - Put the `download_url` as a **plain clickable link in your reply** (widgets block
-  downloads). Mention that the link expires. The workbook holds: **Summary** (run stamps,
-  health KPIs, the AI-insights box), **Pages** (every crawled page with its issues), and
-  **Trends** (per-night crawl health, last 30 days).
+  downloads). Mention that the link expires. The workbook holds: **Summary** (run stamps and
+  health KPIs), **Pages** (every crawled page with its issues), and **Trends** (line charts
+  of per-night crawl health over the last 30 days; the numbers behind them sit on a hidden
+  "Trends Data" sheet).
 - Also share `results.meta.dashboard_url` as a plain link — it opens the **Tapa Crawler
   Dashboard's Health view** with this domain preselected and the date set to Today.
 
-## Step 5 — AI insights (you write them)
+## Step 5 — AI insights (in chat, after the visual)
 
-The workbook's Summary tab has a placeholder box (its cell is named in
-`results.meta.insights_cell`, e.g. `Summary!A44`). The server never fills it — you do.
-
-1. Write 3–6 sharp insights from the data: broken pages and where they cluster, indexability
-   shifts, issue hot-spots, trend direction over the 30 days, and the single most valuable fix.
-   Cite real numbers and URLs from `results` and the workbook.
-2. **If you can execute code and edit files** (Claude Code / Cowork): download the workbook,
-   replace the placeholder text in that exact cell with your insights (openpyxl: load, set the
-   cell's value, save — the cell is merged and wrapped, so just set the anchor cell), then
-   **verify by re-reading the cell** — the placeholder text must be gone and your text present.
-   Deliver the edited workbook to the user as the file deliverable.
-3. **If you cannot edit files** (plain claude.ai chat): give the insights in chat and tell the
-   user the workbook's insights box is intentionally left as a placeholder.
+The workbook deliberately carries data only — the insights are YOURS, written in chat under
+the visualisation. Write 3–6 sharp insights from the data: broken pages and where they
+cluster, indexability shifts, issue hot-spots, trend direction over the 30 days, and the
+single most valuable fix. Cite real numbers and URLs from `results`; every figure must come
+from the data, never from memory of similar sites.
 
 ## Visualisation style (Hookflash house standard)
 

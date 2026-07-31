@@ -1,14 +1,14 @@
 ---
 name: pull-crawl-and-site-speed
-description: Pull a domain's most recent NIGHTLY crawl AND nightly site speed audit from Tapa's monitoring pipelines via the Tether MCP, merged into ONE styled workbook (Summary + crawl pages + crawl trends + speed pages + speed trends), with a deep link into the Tapa Crawler Dashboard and AI insights written by Claude into the workbook's Summary tab. Use when the user runs /pull-crawl-and-site-speed or asks for a combined nightly report, "the full nightly picture", or crawl + speed together for a site. For just the crawl use pull-crawl; for just speed use pull-site-speed; to collect fresh data use tapa-site-crawler / tapa-full-site-speed-audit.
+description: Pull a domain's most recent NIGHTLY crawl AND nightly site speed audit from Tapa's monitoring pipelines via the Tether MCP, merged into ONE styled workbook (Summary + crawl pages + speed pages + 30-day trend tabs of charts for both), with a deep link into the Tapa Crawler Dashboard and cross-referenced AI insights delivered by Claude in chat. Use when the user runs /pull-crawl-and-site-speed or asks for a combined nightly report, "the full nightly picture", or crawl + speed together for a site. For just the crawl use pull-crawl; for just speed use pull-site-speed; to collect fresh data use tapa-site-crawler / tapa-full-site-speed-audit.
 ---
 
 # Pull Crawl + Site Speed (nightly, one workbook)
 
 Turn one domain into its combined nightly report: crawl health AND site speed
-in a single workbook with 30-day trends for both, a Summary tab whose
-AI-insights box YOU fill in (cross-referencing the two datasets), plus an
-in-chat visualisation and a dashboard deep link.
+in a single workbook with 30-day trend charts for both, plus an in-chat
+visualisation, YOUR cross-referenced insights in chat, and a dashboard deep
+link.
 
 ## Prerequisites (read first)
 
@@ -24,8 +24,7 @@ in-chat visualisation and a dashboard deep link.
   and explain they need to sign in there to authenticate the app, then retry.
 - Tools under the Tether MCP: `tapa_nr_options`, `tapa_nr_run`. (No upload tool — the input is
   just a domain. Synchronous — no polling, no job_id.)
-- **Works in normal claude.ai chat** (the insights-into-workbook step needs file handling — see
-  Step 5).
+- **Works in normal claude.ai chat.**
 
 ## Step 1 — Gather the inputs (ask, don't guess)
 
@@ -62,29 +61,22 @@ CSS + inline SVG only, no external resources). Charts are real data charts from 
 
 - Put the `download_url` as a **plain clickable link in your reply** (widgets block
   downloads). Mention that the link expires. The workbook holds: **Summary** (both runs'
-  stamps and KPIs, the AI-insights box), **Crawl Pages**, **Crawl Trends**, **Speed Pages**
-  and **Speed Trends**.
+  stamps and KPIs), **Crawl Pages**, **Speed Pages**, and **Crawl Trends** + **Speed
+  Trends** — both trend tabs are line charts over the last 30 days (the numbers behind them
+  sit on hidden "… Data" sheets).
 - Also share `results.meta.dashboard_url` as a plain link — it opens the **Tapa Crawler
   Dashboard's Health view** with this domain preselected and the date set to Today (the
   Site speed tab is one click away inside the dashboard).
 
-## Step 5 — AI insights (you write them)
+## Step 5 — AI insights (in chat, after the visual)
 
-The workbook's Summary tab has a placeholder box (its cell is named in
-`results.meta.insights_cell`). The server never fills it — you do.
-
-1. Write 4–8 sharp insights **cross-referencing the two datasets** — that's this skill's
-   whole point over running the two pulls separately: heavy pages vs slow page types, broken
-   pages vs their template's speed, crawl-health trend vs performance trend, and the single
-   most valuable fix overall. Judge Core Web Vitals by field data when present (Google's
-   thresholds: LCP 2.5s/4s, INP 200ms/500ms, CLS 0.1/0.25). Cite real numbers and URLs.
-2. **If you can execute code and edit files** (Claude Code / Cowork): download the workbook,
-   replace the placeholder text in that exact cell with your insights (openpyxl: load, set the
-   cell's value, save — the cell is merged and wrapped, so just set the anchor cell), then
-   **verify by re-reading the cell** — the placeholder text must be gone and your text present.
-   Deliver the edited workbook to the user as the file deliverable.
-3. **If you cannot edit files** (plain claude.ai chat): give the insights in chat and tell the
-   user the workbook's insights box is intentionally left as a placeholder.
+The workbook deliberately carries data only — the insights are YOURS, written in chat under
+the visualisation. Write 4–8 sharp insights **cross-referencing the two datasets** — that's
+this skill's whole point over running the two pulls separately: heavy pages vs slow page
+types, broken pages vs their template's speed, crawl-health trend vs performance trend, and
+the single most valuable fix overall. Judge Core Web Vitals by field data when present
+(Google's thresholds: LCP 2.5s/4s, INP 200ms/500ms, CLS 0.1/0.25). Cite real numbers and
+URLs; every figure must come from the data, never from memory of similar sites.
 
 ## Visualisation style (Hookflash house standard)
 
