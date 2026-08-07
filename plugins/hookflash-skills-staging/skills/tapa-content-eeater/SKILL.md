@@ -1,12 +1,13 @@
 ---
 name: tapa-content-eeater
-description: Audit a blog post end-to-end with Tapa's Content EEATer via the Tether MCP — E-E-A-T content analysis plus optional site-duplication and keyword-cannibalisation checks, visualised in chat with a download link to the results workbook. Use when the user runs /tapa-content-eeater, shares a blog link or document and asks for a content/EEAT audit, or asks to check content for E-E-A-T quality, duplication, or cannibalisation.
+description: Audit a blog post end-to-end with Tapa's Content EEATer via the Tether MCP — E-E-A-T content analysis plus optional site-duplication, internal-link and keyword-cannibalisation checks, visualised in chat with a download link to the results workbook. Use when the user runs /tapa-content-eeater, shares a blog link or document and asks for a content/EEAT audit, asks to check content for E-E-A-T quality or duplication, or asks which existing pages should link to a new post. To rank link sources for MANY new pages at once, use /tapa-internal-link-audit instead.
 ---
 
 # Run Content EEATer
 
 Turn a blog post into (1) the Tapa Content EEATer results workbook and (2) an in-chat
-visualisation of the audit — E-E-A-T scores, duplication findings, cannibalisation findings.
+visualisation of the audit — E-E-A-T scores, duplication findings, internal-link opportunities,
+cannibalisation findings.
 
 ## Prerequisites (read first)
 
@@ -57,6 +58,11 @@ the rest of the site? I can either crawl a domain, or use a Screaming Frog expor
 
 Never set both `duplication_domain` and `duplication_file_url`.
 
+**The internal-link suggestions come from this check.** Whatever pages the duplication check
+compares against are also ranked as link *sources* for this content, and each one's own links say
+whether it already points at the audited page. So skipping duplication skips that too — worth
+saying if the user asks where to add internal links.
+
 ## Step 3 — Cannibalisation check (do NOT ask about this)
 
 Tapa handles cannibalisation automatically using the user's connected Search Console accounts,
@@ -91,6 +97,9 @@ Content — one section per section present in `results` (render what's there; s
 - **E-E-A-T scores** — the overall and per-category scores/verdicts as a scored breakdown (bars or
   a table with score chips), using the labels and scales from `results` verbatim.
 - **Duplication findings** — the matched/similar pages and their similarity figures, worst first.
+- **Internal link opportunities** — the pages that should link to this content and don't yet, best
+  topical match first, with their relevance figures. Say how many already link, so the list reads
+  as a to-do rather than a complete picture of the page's internal links.
 - **Cannibalisation findings** — the flagged query/page overlaps. If `results` marks the check as
   skipped or unavailable, show that as a quiet note, not an empty chart.
 - Header line: blog title/URL · checks run · date.
@@ -123,4 +132,4 @@ blocked and the visual collapses to raw HTML).
 - **Single-measure magnitude / score:** one blue ramp light→dark — never a rainbow.
 - Pair colour with a text label or icon (never colour alone); sentence case; round every displayed number.
 
-In this skill: E-E-A-T pillar scores → status bands (good green / borderline amber / weak red); duplication & cannibalisation risk → red/amber/grey.
+In this skill: E-E-A-T pillar scores → status bands (good green / borderline amber / weak red); duplication & cannibalisation risk → red/amber/grey; internal-link relevance → the single blue ramp (it is a magnitude, not a verdict).
