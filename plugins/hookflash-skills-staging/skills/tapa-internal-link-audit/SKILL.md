@@ -1,6 +1,6 @@
 ---
 name: tapa-internal-link-audit
-description: Find the best internal-link sources for new pages with Tapa's Internal Link Audit via the Tether MCP — ranks a site's existing pages by content similarity to each new page, visualised in chat with a download link to the results workbook. Use when the user runs /tapa-internal-link-audit, asks where to add internal links for a new page, or wants link-source suggestions from a site crawl.
+description: Find the best internal-link sources for MANY new pages at once with Tapa's Internal Link Audit via the Tether MCP — ranks a site's existing pages by content similarity to each new page, visualised in chat with a download link to the results workbook. Use when the user runs /tapa-internal-link-audit, or has a batch of new or planned pages (a content plan, a migration, a whole category) and wants link-source suggestions from a site crawl. For a SINGLE page, /tapa-content-eeater already ranks link sources as part of its audit and also says which pages already link to it — prefer that unless the user has a crawl export and a list of pages in hand.
 ---
 
 # Tapa Internal Link Audit
@@ -8,6 +8,10 @@ description: Find the best internal-link sources for new pages with Tapa's Inter
 Turn a whole-site crawl plus one or more new pages into (1) the Internal Link Audit workbook
 (existing pages ranked as internal-link sources per new page) and (2) an in-chat
 visualisation of the top opportunities.
+
+**One page, or no crawl export to hand?** `/tapa-content-eeater` ranks link sources for the page
+it audits, from the pages it crawls itself, and additionally reports which of them already link to
+it. This skill is for the batch case: many new pages scored against one crawl in a single run.
 
 ## Prerequisites (read first)
 
