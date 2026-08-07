@@ -24,24 +24,36 @@ length is a function of how many opportunities clear the bar, not a fixed page c
 
 ## Safety rules that are not negotiable
 
-You will be driving a browser around a real client's live website. These are hard limits, not
-preferences:
+A browser will be open on a real client's live website. These are hard limits, not preferences:
 
-- **Never complete a purchase.** On ecommerce you may add to cart and reach the checkout page.
-  Stop there. Never click pay, place order, confirm, or anything equivalent.
+- **You never click a commerce or submit control. The human does.** The funnel walk in Step 2 is
+  driven by the person, not by you — you read what fired, you do not press anything. That is the
+  design, not a fallback, and it is what makes the walk safe in any browser.
+- **Never complete a purchase**, and never click pay, place order, confirm, or anything equivalent.
 - **Never submit the final step of a lead form.** Walking forward through intermediate steps is
   fine and is the point. Submitting the last one creates a real lead in the client's CRM, fires
   their conversion tracking (which feeds Google Ads bidding and pollutes the very GA4 data you are
   about to analyse), and may trigger real emails or underwriting lookups. You already know the
   conversion event name from GA4, so there is nothing left to learn by pressing the button.
-- **Never enter real personal data.** Obvious test values only (`test@test.com`, `Test`,
-  `0000000000`). If a step demands something you cannot fake — a real registration number, a real
-  policy number — stop and ask the user to walk that step themselves.
-- **Use the in-app browser**, never Claude in Chrome. The in-app one has no access to the user's
-  real sessions or saved cards, so there is no payment method to fire by accident.
-- **Tell the user before the walk** that you will be moving through their client's funnel with test
-  data, and let them confirm. Agencies generally have permission to do this; it is still better
-  raised in advance.
+- **Never enter real personal data.** If you are asked to type anything, obvious test values only
+  (`test@test.com`, `Test`, `0000000000`). If a step needs something you cannot fake — a real
+  registration or policy number — the user types it.
+- **Tell the user before the walk** what is about to happen, and let them confirm. Agencies
+  generally have permission to poke around a client's funnel; it is still better raised in advance.
+
+### Which browser
+
+Use whichever browser tooling this session has. **Do not stop to ask the user to choose, and do not
+abandon the walk because a particular browser is missing.**
+
+- **A sandboxed in-app browser, if present** — first choice. It carries none of the user's logged-in
+  sessions or saved cards.
+- **Claude in Chrome, if that is all there is** — acceptable. It is the user's real browser, so say
+  so once, and suggest they use a fresh or private window if the client's site is one they shop on.
+  The purchase risk lives in *clicking*, and you are not clicking.
+- **Neither available** — do not block. Ask the user to walk the funnel in their own browser and
+  send you the step URLs and a screenshot per step, then carry on at Step 2c. You lose the event
+  trace, so lean on the GA4 evidence in 2a and mark the spec `confirmed: false` until they check it.
 
 ## Step 1 — Ground the property and check for a stored spec
 
@@ -84,7 +96,8 @@ You need each step's URL and layout, and confirmation that the events fire where
 click through yourself — bot protection challenges automated walks, and a human decides what is
 safe to submit.
 
-1. Open the site's homepage in the in-app browser.
+1. Open the site's homepage in whichever browser this session has (see [Which
+   browser](#which-browser)).
 2. Tell the user, in these terms: *"Walk the funnel the way a customer would, from here to just
    before the final submit. **Pause two or three seconds on each page** so I can capture what
    fired. Don't submit the last step."*
@@ -212,8 +225,25 @@ For each test card you need two images: the element as it is, and the element as
 3. **Look at every image before it goes near the deck** (ADR-0006). Check: did the model change
    only what you asked; is the brand intact; is there a consent wall still covering the hero; did a
    full-page shot come back with holes where lazy content had not loaded. If the variation drifted,
-   tighten the region and run again. Two rounds, then fall back to showing the original with the
-   change described in words — an honest description beats a wrong picture.
+   tighten the region and run again. Two rounds, then degrade as below.
+
+### When mockups are not available
+
+Mockups are a nice-to-have on a test card. The data and the hypothesis are the deliverable.
+**Degrade and carry on — do not stop to ask whether to continue without them**, and do not offer
+the user a menu of options. Say plainly what you could not produce and hand over the rest.
+
+- **A variation drifted twice, or `tapa_var_run` is failing** (a 502 naming a model endpoint means
+  the image model is unreachable — that is a platform problem, not something to retry your way out
+  of): use the **Original screenshot alone** and describe the proposed change in words on the card.
+- **`tapa_shot_run` is failing too**: build the card with no images at all.
+- Either way, use a layout whose picture boxes you can fill — a test card on layout 7 needs **both**
+  images or the build 400s, so a card with only an Original belongs on layout 8, and a card with no
+  images on layout 28.
+- Note the gap once in the handover ("mockups unavailable this run — the image service was down"),
+  and mention it to Connor so it gets fixed. Do not caveat every slide.
+
+An honest description beats a wrong picture, and a deck with no pictures beats no deck.
 
 ## Step 7 — Build the deck
 
@@ -251,6 +281,11 @@ as a note — "stored, so the next audit for this client skips the walk".
 
 ## Avoid these
 
+- **Do not stop and offer the user a menu when a tool is unavailable.** A missing browser, a dead
+  image model, a failing capture — each has a defined degradation above. Take it, finish the audit,
+  and report what was missing at handover. The user asked for an audit, not for a decision about
+  which of your dependencies is broken. Ask only when proceeding would be *unsafe* or would make
+  the output *wrong*, which a missing mockup does not.
 - **Never invent behavioural evidence.** You have GA4 and screenshots. You do not have scroll maps,
   click maps or session recordings. If a hypothesis needs "users don't scroll", either get it from a
   GA4 `scroll` event or say the evidence is missing.
