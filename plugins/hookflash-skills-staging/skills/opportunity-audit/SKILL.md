@@ -1,25 +1,34 @@
 ---
 name: opportunity-audit
-description: Turn a GA4 property into a client-ready Opportunity Audit deck — pull the data, map the client's real conversion funnel, find where the money is leaking, and propose prioritised A/B tests with before/after mockups of each proposed change. Use when the user runs /opportunity-audit, asks for an opportunity audit, a CRO audit of a whole site, "where should we test first", a test backlog or roadmap from analytics, or points at a GA4 property and asks what to test. Works for lead gen and ecommerce. Not for reading a finished test's results — that is /tapa-results-analysis — and not for a single page's heuristic review, which is /hypothesis-ux-audit.
+description: Turn a GA4 property into the data foundation of an Opportunity Audit — map the client's real conversion funnel, pull every split that could inform testing (funnel steps, landing pages, page types, channels, sources, devices and more), and deliver an Excel workbook of all the data pulled plus a tab of prioritised test hypotheses with the reasoning and the exact numbers behind each. Use when the user runs /opportunity-audit, asks for an opportunity audit, a CRO audit of a whole site, "where should we test first", a test backlog or roadmap from analytics, or points at a GA4 property and asks what to test. Works for lead gen and ecommerce. Not for reading a finished test's results — that is /tapa-results-analysis — and not for a single page's heuristic review, which is /hypothesis-ux-audit.
 ---
 
-# Opportunity Audit
+# Opportunity Audit (data-foundation phase)
 
-Point at a GA4 property, come away with a deck: what the data says, where the drop-off is, and a
-prioritised set of test proposals with a mockup of each one. Lead gen or ecommerce, so long as the
-tracking is decent.
+Point at a GA4 property, come away with a workbook: every split of the data worth pulling, where
+the drop-off is, and a prioritised set of test hypotheses, each one citing the tab and the number
+it came from.
 
-The deck repeats one motif per opportunity — **data slide → observation slide → test card** — so its
-length is a function of how many opportunities clear the bar, not a fixed page count.
+**Why a workbook and not a deck.** The experimentation team is reviewing whether this audit stands
+on good foundations — does it find the right funnel, and does it pull a comprehensive enough set of
+data to inform good tests? So this phase delivers the foundation itself, fully inspectable, rather
+than the deck built on top of it. The deck build (screenshots, mockups, `build_slide_deck`) is
+parked, not gone; its steps live in this file's git history and return once the team signs off.
+
+The bias of this phase is **comprehensiveness over curation**. A slice that turns out to show
+nothing still goes in the workbook — it is evidence of what was checked.
 
 ## Prerequisites
 
-1. **Tether connected** with the Tapa tools available. Check `tapa_funnel_get` and `tapa_shot_run`
-   are in your tool list. If not, the user needs the `hookflash-skills` plugin installed and Tether
-   authorised — say so and stop.
+1. **Tether connected** with the Tapa tools available. Check `tapa_funnel_get` is in your tool
+   list. If not, the user needs the `hookflash-skills` plugin installed and Tether authorised —
+   say so and stop.
 2. **GA4 access.** These tools run as the user's own Google grant. If a call returns a
    reconnect error, send them to `tapa.hookflash.co.uk/connect`.
-3. **A browser you can drive** — only for a first-time audit on a client (Step 2). Later audits
+3. **A session that can write files** — the workbook is built locally with Python + openpyxl
+   (Cowork or Claude Code). If you cannot create files in this session, say so and stop rather
+   than delivering tables pasted into chat.
+4. **A browser you can drive** — only for a first-time audit on a client (Step 2). Later audits
    read the stored funnel spec and need no browser at all.
 
 ## Safety rules that are not negotiable
@@ -66,8 +75,8 @@ Ask only for what you cannot look up. You need a GA4 property and a date range.
    - **An unconfirmed spec exists** → show it to the user, ask them to confirm or correct it, then
      `tapa_funnel_put` with `confirmed: true`. Skip the walk.
    - **Nothing stored** → Step 2.
-3. Default the date range to the **last complete calendar month**. Say which range you used on
-   every slide, as the example deck does.
+3. Default the date range to the **last complete calendar month**. Record which range you used on
+   the workbook's README tab and on every data tab.
 
 ## Step 2 — Map the real funnel (first audit for a client only)
 
@@ -143,33 +152,47 @@ correct it. **This is the one place you must ask.** Then `tapa_funnel_put` with 
 Only set `confirmed: true` when a human has actually said yes. Every later audit trusts a confirmed
 spec without asking again, so a confirmed guess quietly corrupts every audit after it.
 
-## Step 3 — The scoped GA4 pass
+## Step 3 — The comprehensive GA4 pass
 
-Now that the funnel means something, pull the numbers. This is the analysis the deck is built on.
-Use `answer_client_data_question` for the slices and `run_ga4_funnel_report` for step-to-step
-drop-off.
+Now that the funnel means something, pull the numbers. This pass feeds the workbook, and the
+workbook has no space constraint, so the deck-era instinct to pull only what earns a slide does not
+apply. **Pull every slice below, at full depth** — full tables, not top tens. If a tool response
+comes back truncated or row-limited, say so on that slice's tab rather than presenting the part as
+the whole. Use `answer_client_data_question` for the slices and `run_ga4_funnel_report` for
+step-to-step drop-off.
 
-Pull, at minimum:
-
-| Slice | Why it earns a slide |
+| Slice | What it can reveal |
 |---|---|
-| Device × each funnel step | Where the volume is vs where the conversion is |
-| Landing page × sessions × conversion rate | The pages worth testing at all |
-| Landing page grouped by page type | Which *kind* of page carries the business |
-| Channel group × sessions × conversion rate | Which traffic converts |
-| Landing page × channel group | The combination effects — often the real finding |
 | Step-to-step drop-off, whole funnel | Where the leak is |
-| Step-to-step drop-off by device and by top landing pages | Whose leak it is |
+| Step-to-step drop-off by device, by channel group, and by top landing pages | Whose leak it is |
+| Each funnel step × device category | Where the volume is vs where the conversion is |
+| Each funnel step × session default channel group | Which traffic gets how deep |
+| Landing page × sessions × conversions × conversion rate | The pages worth testing at all |
+| Landing page grouped by page type | Which *kind* of page carries the business |
+| Landing page × device | A page that converts on desktop and dies on mobile |
+| Landing page × channel group | The combination effects — often the real finding |
+| Session default channel group × sessions × conversion rate | Which traffic converts |
+| Session source/medium × sessions × conversion rate | The grain below channel group — where the paid and referral stories hide |
+| Campaign × sessions × conversion rate (where paid traffic exists) | Which spend lands on which pages |
+| Device category × sessions × conversion rate | The headline device split |
+| New vs returning × sessions × conversion rate | Whether the funnel serves first-time visitors |
+| Country × sessions × conversion rate | Whether one market drags the average |
+| Daily sessions and conversions across the range | Seasonality, launch spikes, tracking gaps |
+
+If the property, the funnel walk, or the user's brief suggests another split matters for this
+client (site search use, logged-in state, a promo parameter), pull it too and give it a tab. The
+list above is the floor, not the ceiling.
 
 Then run these checks before you interpret anything:
 
 - **Plausibility.** Flag any rate that is impossible (>100%), any two near-identical pages with a
   wildly different rate (a 4x gap between `/car-insurance` and `/insurance/car` is a tracking or
   redirect artefact far more often than a UX finding), and any step whose completion rate exceeds
-  the step before it. **Report these as data-quality findings. Do not write a test hypothesis on
-  top of one.** This is the single biggest way an automated audit embarrasses itself.
-- **Sampling and thresholding.** If a response came back sampled or thresholded, say so on the
-  slide. Do not quietly present a sampled number as fact.
+  the step before it. **Report these as data-quality findings on the Data quality tab. Do not
+  write a test hypothesis on top of one.** This is the single biggest way an automated audit
+  embarrasses itself.
+- **Sampling and thresholding.** If a response came back sampled or thresholded, record that on the
+  slice's tab and on the Data quality tab. Do not quietly present a sampled number as fact.
 - **`(not set)` and Unassigned.** Report the bucket rather than dropping it; a large one is itself
   a finding.
 
@@ -185,15 +208,16 @@ good the idea is, and a backlog full of unpowered tests is the standard failure 
 
 Rough guide at 95% confidence and 80% power, two-sided, per variant: you need roughly
 `16 × p(1-p) / (p × mde)²` sessions per variant. Compute it properly per candidate rather than
-eyeballing it, state the MDE each surviving test can detect, and list what you dropped and why —
-that list is genuinely useful to the client.
+eyeballing it, and state the MDE each surviving test can detect. **Every candidate — kept or
+dropped — gets a row on the Opportunities tab with its gap, its volume, its MDE arithmetic, and
+the verdict.** The dropped list is not waste; it is half of what the team is reviewing.
 
 Rank what survives on: size of the measured gap × traffic affected × how directly it touches the
 primary conversion.
 
 ## Step 5 — Design the tests
 
-For each surviving opportunity, write a test card in the house format:
+For each surviving opportunity, write a test in the house format:
 
 - **Hypothesis**, as IF / THEN / BECAUSE. The BECAUSE must cite the finding it came from, with the
   number. "BECAUSE only 24% of mobile sessions scroll far enough to see all products" — not
@@ -203,96 +227,73 @@ For each surviving opportunity, write a test card in the house format:
   the top of the funnel and breaks the bottom).
 - **Expected MDE** from Step 4.
 
-Every card must trace back to a slide. If you cannot point at the data that motivated it, cut it.
+Every test must trace back to the data: its row on the Hypotheses tab names the workbook tab (and
+the row or segment on it) that motivated it, and the BECAUSE quotes a number that appears there.
+If you cannot point at the data that motivated it, cut it.
 
 Then prioritise, using the house weights: Expected uplift ×4, Data backed ×4, Development effort
-×4, Traffic volume ×3, Strategic alignment ×2, Design effort ×2, Asset effort ×1.
+×4, Traffic volume ×3, Strategic alignment ×2, Design effort ×2, Asset effort ×1. Keep the
+per-criterion scores, not just the total — the team wants to see the weighing, not the verdict.
 
-## Step 6 — Screenshots and mockups
+## Step 6 — Build the review workbook
 
-For each test card you need two images: the element as it is, and the element as proposed.
+One `.xlsx`, built with openpyxl, in this tab order:
 
-1. **Capture the current state** with `tapa_shot_run`. Pass `selector` for the element the test
-   changes — that gives a clean shot of the actual element instead of a crop of a page shot at
-   guessed coordinates. Batch the URLs (8 per call, desktop and mobile).
-   - For a page you cannot reach from the server (behind a login or a part-filled form), use the
-     screenshots you took during the Step 2 walk.
-2. **Build the variation** with `tapa_var_run`: the capture's `filename`, a `region`, and a
-   concrete instruction. Always pass a region — the region, not the instruction, is what stops the
-   model redrawing the client's logo and grid. Region coordinates are pixels in the source image;
-   use the `width`/`height` that `tapa_shot_run` reported, which for a full-page capture is not the
-   same as CSS pixels.
-3. **Look at every image before it goes near the deck** (ADR-0006). Check: did the model change
-   only what you asked; is the brand intact; is there a consent wall still covering the hero; did a
-   full-page shot come back with holes where lazy content had not loaded. If the variation drifted,
-   tighten the region and run again. Two rounds, then degrade as below.
+| Tab | Contents |
+|---|---|
+| **README** | Property and id, date range, who confirmed the funnel spec and when, a one-line index of every tab, a summary of any data-quality flags, and the generated timestamp |
+| **Funnel** | The stored funnel spec as a table (step, event, where it fires, URL), then the step-to-step drop-off tables: whole property, by device, by channel group, by top landing pages |
+| **One tab per Step 3 slice** | The full table for that slice, named plainly (`Landing pages`, `LP x Device`, `LP x Channel`, `Sources`, `Campaigns`, `Devices`, `New vs returning`, `Countries`, `Daily trend`…) |
+| **Data quality** | Every plausibility flag, sampling/thresholding note, and `(not set)`/Unassigned bucket, each with where it was seen and what it means for reading the data |
+| **Opportunities** | Every candidate from Step 4, kept and dropped: the measured gap, the volume behind it, the MDE arithmetic (sessions per variant, detectable effect), the verdict, and the reason |
+| **Hypotheses** | One row per surviving test: name, IF, THEN, BECAUSE, evidence (tab + row/segment it traces to), pages, audience, primary metric, secondary metrics, expected MDE, the seven priority sub-scores, total, rank |
 
-### When mockups are not available
+Rules for the build:
 
-Mockups are a nice-to-have on a test card. The data and the hypothesis are the deliverable.
-**Degrade and carry on — do not stop to ask whether to continue without them**, and do not offer
-the user a menu of options. Say plainly what you could not produce and hand over the rest.
+- **Write real numbers, not strings.** Rates go in as fractions with a `0.0%` number format,
+  volumes as integers with `#,##0` — the team will want to re-derive and re-sort, and a column of
+  text can do neither.
+- Formatting is light and consistent: bold header row (white on blue `#2F6BED`), freeze the header,
+  autofilter on every data tab, sensible column widths. No charts this phase — the review is about
+  the data, and a dependable table beats a decorative one.
+- Every data tab states its own date range and its source tool in a line above the header, so a
+  tab forwarded on its own still says what it is.
+- **Do not trim, round away, or top-N a tab to make it tidy.** Comprehensiveness is what the team
+  asked to see.
 
-- **A variation drifted twice, or `tapa_var_run` is failing** (a 502 naming a model endpoint means
-  the image model is unreachable — that is a platform problem, not something to retry your way out
-  of): use the **Original screenshot alone** and describe the proposed change in words on the card.
-- **`tapa_shot_run` is failing too**: build the card with no images at all.
-- Either way, use a layout whose picture boxes you can fill — a test card on layout 7 needs **both**
-  images or the build 400s, so a card with only an Original belongs on layout 8, and a card with no
-  images on layout 28.
-- Note the gap once in the handover ("mockups unavailable this run — the image service was down"),
-  and mention it to Connor so it gets fixed. Do not caveat every slide.
-
-An honest description beats a wrong picture, and a deck with no pictures beats no deck.
-
-## Step 7 — Build the deck
-
-Use `build_slide_deck` with the `hookflash_general` template. No new template is needed; these
-layouts already do the job:
-
-| Layout | Use | Placeholders |
-|---|---|---|
-| 19 | Section divider | `0` title |
-| 15 | **Data slide** | `0` title, `13` chart, `14` findings bullets |
-| 8 | **Observation slide** | `0` title, `13` screenshot, `15` commentary |
-| 7 | **Test card** | `0` title, `13` Original image, `14` Variation image, `15` hypothesis + metrics |
-| 28 | Closing summary | `0` title, `31`/`32`/`33` text blocks |
-
-Charts go in `charts` with an `at`, and can target any placeholder. Images go in `images` with an
-`at` and **must** target a PICTURE placeholder — on layouts 7 and 8 that is `13` and `14`.
-
-**Every PICTURE placeholder must be consumed or the build 400s.** So a test card on layout 7 needs
-*both* images: if you only have an Original, either put something real in `14` or use a different
-layout. Do not fill it with a placeholder image.
-
-Structure: title → what we looked at → then, per opportunity, data slide + observation slide + one
-test card per test → prioritised backlog → appendix of the slices that did not earn a slide.
-
-Then **review the returned thumbnails. Never deliver a slide you have not looked at.** Check for
-overflowing text, collided boxes, cropped images, and empty placeholders. A 400 from the build
-lists what is missing — fix and call again. Two rebuild rounds, then ship what you have and say
-what is imperfect.
+Then **verify before handover (ADR-0006)**: reopen the file with openpyxl and check that every
+expected tab exists and holds the rows you meant to write, spot-check at least three numbers
+against the original tool responses, and confirm every evidence pointer on the Hypotheses tab names
+a tab that actually exists. Fix and rebuild anything that fails; never deliver a workbook you have
+not reopened.
 
 ## Deliver
 
-In chat: the headline findings as a short visual summary, the deck download link as plain text, the
-count of tests proposed and dropped, and anything the data could not answer. Offer the funnel spec
-as a note — "stored, so the next audit for this client skips the walk".
+Hand over the workbook file, and in chat:
+
+- the funnel used, and whether it was stored already or mapped and confirmed this run
+- what was pulled: the count of slices and rows, and anything that came back truncated or sampled
+- the headline findings, briefly — three to five, each with its number
+- tests proposed and candidates dropped, as counts
+- any data-quality flags worth a sentence
+- a note that the funnel spec is stored, so the next audit for this client skips the walk
+
+Say plainly that this phase produces no deck: the workbook **is** the deliverable, for the
+experimentation team to review the foundation the deck will later stand on.
 
 ## Avoid these
 
-- **Do not stop and offer the user a menu when a tool is unavailable.** A missing browser, a dead
-  image model, a failing capture — each has a defined degradation above. Take it, finish the audit,
-  and report what was missing at handover. The user asked for an audit, not for a decision about
-  which of your dependencies is broken. Ask only when proceeding would be *unsafe* or would make
-  the output *wrong*, which a missing mockup does not.
+- **Do not stop and offer the user a menu when a tool is unavailable.** A missing browser has a
+  defined degradation above. Take it, finish the audit, and report what was missing at handover.
+  Ask only when proceeding would be *unsafe* or would make the output *wrong*.
 - **Never invent behavioural evidence.** You have GA4 and screenshots. You do not have scroll maps,
   click maps or session recordings. If a hypothesis needs "users don't scroll", either get it from a
   GA4 `scroll` event or say the evidence is missing.
 - **Never present a plausibility-flagged number as a finding.** It is a tracking bug until proven
-  otherwise.
+  otherwise — it belongs on the Data quality tab, not under a hypothesis.
 - **Never compare to "industry benchmarks".** We do not have a benchmark source. Compare segments
   within the property instead.
-- **No em dashes in client-facing slide text.**
-- **Never leave a template zone filled with filler.** Cut the slide instead.
+- **Never write a hypothesis whose BECAUSE number is not in a data tab.** The traceability is the
+  point of this deliverable.
+- **No em dashes in hypothesis and test text** — it gets pasted into client-facing decks later.
 - Do not promise a test will win. Say what it is designed to move and what it can detect.
