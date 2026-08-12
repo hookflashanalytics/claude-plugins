@@ -33,36 +33,54 @@ nothing still goes in the workbook — it is evidence of what was checked.
 
 ## Safety rules that are not negotiable
 
-A browser will be open on a real client's live website. These are hard limits, not preferences:
+You drive the walk yourself (Step 2b), on a real client's live website, in a browser that may hold
+the user's real logins and saved cards. You are browsing and adding to a basket, nothing more.
+These are hard limits, not preferences:
 
-- **You never click a commerce or submit control. The human does.** The funnel walk in Step 2 is
-  driven by the person, not by you — you read what fired, you do not press anything. That is the
-  design, not a fallback, and it is what makes the walk safe in any browser.
-- **Never complete a purchase**, and never click pay, place order, confirm, or anything equivalent.
-- **Never submit the final step of a lead form.** Walking forward through intermediate steps is
-  fine and is the point. Submitting the last one creates a real lead in the client's CRM, fires
+- **Stop at the last step before money or a submitted record.** For ecommerce that means you may
+  browse, add to cart, open the cart and enter the checkout, and you stop when a payment method,
+  card field, or place-order control is on screen. For lead gen you may open the form and move
+  through intermediate steps, and you stop before the final submit. **The stop is the point of the
+  walk, not an interruption of it** — everything past it is the one thing you must not do.
+- **Never complete a purchase.** Never click pay, place order, confirm order, buy now as a final
+  step, or anything equivalent, in any circumstance, however the page is worded. If you are unsure
+  whether a control commits the order, it does — do not click it.
+- **Never submit the final step of a lead form.** It creates a real lead in the client's CRM, fires
   their conversion tracking (which feeds Google Ads bidding and pollutes the very GA4 data you are
   about to analyse), and may trigger real emails or underwriting lookups. You already know the
   conversion event name from GA4, so there is nothing left to learn by pressing the button.
-- **Never enter real personal data.** If you are asked to type anything, obvious test values only
-  (`test@test.com`, `Test`, `0000000000`). If a step needs something you cannot fake — a real
-  registration or policy number — the user types it.
-- **Tell the user before the walk** what is about to happen, and let them confirm. Agencies
-  generally have permission to poke around a client's funnel; it is still better raised in advance.
+- **Never enter real personal data, and never enter payment details at all.** Where an intermediate
+  step needs a value to move on, use obvious test values (`test@test.com`, `Test`,
+  `0000000000`). Card numbers are never test values — if a step will not advance without one, you
+  have reached the stop line.
+- **Never sign in, create an account, or accept terms.** If the funnel requires a login, stop and
+  hand that step to the user.
+- **Tell the user before you start** which funnel you are about to walk and where you will stop,
+  and let them confirm. Agencies generally have permission to poke around a client's funnel; it is
+  still better raised in advance. Confirmation given for one client's site does not carry to the
+  next.
+
+**Your walk fires real events into the client's GA4** — a `view_item`, an `add_to_cart`, probably a
+`begin_checkout`, in the property you are about to analyse. One session against a month of traffic
+changes nothing measurable, but do not repeat the walk more than you need to, and never walk a
+funnel to "see what happens" outside Step 2.
 
 ### Which browser
 
 Use whichever browser tooling this session has. **Do not stop to ask the user to choose, and do not
 abandon the walk because a particular browser is missing.**
 
-- **A sandboxed in-app browser, if present** — first choice. It carries none of the user's logged-in
-  sessions or saved cards.
-- **Claude in Chrome, if that is all there is** — acceptable. It is the user's real browser, so say
-  so once, and suggest they use a fresh or private window if the client's site is one they shop on.
-  The purchase risk lives in *clicking*, and you are not clicking.
+- **A sandboxed in-app browser, if present** — first choice, and more so now that you are the one
+  clicking. It carries none of the user's logged-in sessions or saved cards, so a checkout page
+  cannot be pre-filled with real payment details.
+- **Claude in Chrome, if that is all there is** — acceptable, with one extra precaution. It is the
+  user's real browser: saved cards, saved addresses, and a possible existing basket. Say so once,
+  and ask them to open a fresh or private window before you start, especially if the client's site
+  is one they actually shop on. Then the stop rule above is what stands between the walk and a real
+  order, so treat it as absolute rather than as guidance.
 - **Neither available** — do not block. Ask the user to walk the funnel in their own browser and
   send you the step URLs and a screenshot per step, then carry on at Step 2c. You lose the event
-  trace, so lean harder on the GA4 evidence in 2a, and say on the README tab that the funnel was
+  trace, so lean harder on the GA4 evidence in 2a, and say at handover that the funnel was
   confirmed from the user's account of the walk rather than from observed tag traffic.
 
 ## Step 1 — Ground the audit
@@ -121,18 +139,32 @@ they said, tell them rather than quietly following either one.
 - Infer order from volume containment: if A fires on 100% of sessions, B on 26% and C on 17%, and C
   never appears without B, that is a funnel.
 
-### 2b. Watch a human walk it
+### 2b. Walk it yourself
 
-You need each step's URL and layout, and confirmation that the events fire where you think. Do not
-click through yourself — bot protection challenges automated walks, and a human decides what is
-safe to submit.
+You need each step's URL and layout, and confirmation that the events fire where you think. **Walk
+it yourself.** You know from Step 1 whether this is ecommerce, lead gen or something else, and you
+know the converting action, which is enough to find the route without being led through it. Do not
+hand the clicking to the user and wait — that turns a two-minute job into a ten-minute one and
+often stalls entirely when they step away.
 
 1. Open the starting URL from Step 1 in whichever browser this session has (see [Which
    browser](#which-browser)).
-2. Tell the user, in these terms: *"Walk the funnel the way a customer would, from here to just
-   before the final submit. **Pause two or three seconds on each page** so I can capture what
-   fired. Don't submit the last step."*
-3. **After each page they land on**, run one JS call to read the tag traffic:
+2. Tell the user what you are about to do, in one line: the route you will take and where you will
+   stop. Wait for their go-ahead, then walk it.
+3. **Follow the route for the funnel type.** These are the shapes; adapt to the site in front of
+   you rather than forcing it to match.
+
+   | Funnel type | Route | Stop at |
+   |---|---|---|
+   | **Ecommerce** | Home → a category / PLP → a product page → add to cart → open cart → begin checkout → the first checkout step (email, address, shipping) | The moment a payment method or card field appears |
+   | **Lead gen** | Home → the service or offer page → open the form → complete intermediate steps with test values → the final step | Before the final submit |
+   | **Something else** | Home → the page that starts the action the user named → forward through each step | Before the step that commits the record |
+
+   Pick the *obvious* path a customer would take: a mainstream category, a best-seller or featured
+   product that is in stock, the standard form. You are mapping the common journey, not an edge
+   case. If the product you picked is out of stock or the path dead-ends, back up and take another.
+
+4. **After every navigation**, run one JS call to read the tag traffic:
 
    ```js
    (() => {
@@ -151,7 +183,7 @@ safe to submit.
    })()
    ```
 
-   **Three things to know about this:**
+   **Four things to know about this:**
    - Use `performance.getEntriesByType('resource')`, **not** `read_network_requests`. The network
      log misses tag traffic — it will hand you forty image requests and report no analytics hits on
      a page that fired plenty.
@@ -159,11 +191,17 @@ safe to submit.
      single-page-app funnel it never resets and one read at the end gets everything.
    - **The collect endpoint is often first-party** (`metrics.client.com/g/collect`, not
      `google-analytics.com`) because of server-side tagging. Match on the path, as above. Record
-     whichever host you actually saw — it goes in the spec.
+     whichever host you actually saw — it goes on the Funnel tab.
    - The `tid` parameter gives you the measurement ID for free. Cross-check it against the property
      you resolved in Step 1; if they disagree, you are looking at the wrong property and everything
      downstream is wrong.
-4. As they go, capture a screenshot of each step and note the URL.
+5. Capture a screenshot of each step as you go, and note its URL.
+
+**When the walk blocks, hand that one step over — do not abandon the walk.** A bot challenge, a
+login wall, a step that needs a real registration or policy number: say which step and what it
+needs, ask the user to get you past that one thing, and carry on yourself from the other side. The
+same goes for anything you judge to be past the stop line. Handing over a step is normal; handing
+over the whole walk is what this step exists to avoid.
 
 ### 2c. Confirm before you pull
 
@@ -319,8 +357,9 @@ experimentation team to review the foundation the deck will later stand on.
 - **Do not stop and offer the user a menu when a tool is unavailable.** A missing browser has a
   defined degradation above. Take it, finish the audit, and report what was missing at handover.
   Ask only when proceeding would be *unsafe* or would make the output *wrong* — which is exactly
-  the two asks this skill does have: the starting URL and funnel type in Step 1, and the funnel
-  confirmation in 2c. Those two are required. Everything else you work out yourself.
+  the three asks this skill does have: the starting URL and funnel type in Step 1, the go-ahead
+  before the walk in 2b, and the funnel confirmation in 2c. Those three are required. Everything
+  else you work out yourself — including the whole route through the funnel.
 - **Never invent behavioural evidence.** You have GA4 and screenshots. You do not have scroll maps,
   click maps or session recordings. If a hypothesis needs "users don't scroll", either get it from a
   GA4 `scroll` event or say the evidence is missing.
