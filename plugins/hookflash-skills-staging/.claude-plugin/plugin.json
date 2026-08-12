@@ -1,7 +1,7 @@
 {
   "name": "hookflash-skills-staging",
-  "version": "0.7.1",
-  "description": "Hookflash skills under test — nominated testers only. Deliberately ships no MCP config; Tether comes from the hookflash-skills plugin.",
+  "version": "0.8.0",
+  "description": "Hookflash skills under test \u00e2\u20ac\u201d nominated testers only. Deliberately ships no MCP config; Tether comes from the hookflash-skills plugin.",
   "author": {
     "name": "Hookflash AI Ops"
   }

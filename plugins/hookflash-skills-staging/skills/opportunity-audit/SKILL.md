@@ -243,6 +243,11 @@ step-to-step drop-off.
 | Country × sessions × conversion rate | Whether one market drags the average |
 | Daily sessions and conversions across the range | Seasonality, launch spikes, tracking gaps |
 
+**Pull `totalUsers` alongside sessions on every slice, and converting users alongside conversions.**
+Step 4 powers its tests on users, because that is what a test randomises on, and it cannot go back
+for them later without re-running the whole pass. A slice with sessions but no users forces an
+estimate onto every candidate that comes from it.
+
 If the property, the funnel walk, or the user's brief suggests another split matters for this
 client (site search use, logged-in state, a promo parameter), pull it too and give it a tab. The
 list above is the floor, not the ceiling.
@@ -277,18 +282,88 @@ effect at that segment's current traffic over a four-week run, and drop the cand
 reach significance.** A page doing 400 sessions a month cannot produce a significant result however
 good the idea is, and a backlog full of unpowered tests is the standard failure of automated CRO.
 
-Rough guide at 95% confidence and 80% power, two-sided, per variant: you need roughly
-`16 × p(1-p) / (p × mde)²` sessions per variant. Compute it properly per candidate rather than
-eyeballing it, and state the MDE each surviving test can detect. **Every candidate — kept or
-dropped — gets a row on the Opportunities tab with its gap, its volume, its MDE arithmetic, and
-the verdict.** The dropped list is not waste; it is half of what the team is reviewing.
+### The MDE calculation
+
+Two-sided, 95% confidence, 80% power, comparing two proportions:
+
+```
+n per arm  = K · p(1-p) / (p · mde_rel)²
+mde_rel    = sqrt( K · p(1-p) / n ) / p
+
+K = 2 · (z(0.975) + z(0.80))²  =  2 · (1.95996 + 0.84162)²  =  15.6978
+```
+
+Use **15.6978**. `16` is the familiar rounded form and it is ~1% conservative, which is harmless,
+but write the constant you used into the tab's context line either way so the number can be checked.
+
+Four rules about the inputs. Each of them changes the answer, and three of them are easy to get
+subtly wrong:
+
+1. **Use one unit for `p` and `n`, and make it the unit you will randomise on — users.** A test
+   assigns a *visitor* to an arm, so sessions are not independent trials: 274,336 sessions from
+   197,957 users is 1.39 sessions per user, and counting them as 274,336 independent draws
+   overstates your evidence. Take `n` = users in the segment and `p` = converting users / users in
+   the segment.
+
+   **Do not "correct" a session-grain number by dividing `n` and leaving `p` alone.** Converting
+   both together is close to neutral — the homepage candidate moves from 19.31% to 19.26% — because
+   dividing `n` by sessions-per-user multiplies `p` by the same factor and the two cancel. Mixing
+   the grains is what produces a wrong answer, in either direction. So pull users alongside
+   sessions for every slice in Step 3, and if a segment only has session data, convert both
+   (`p_user = p_session × sessions per user`) and say so on the row.
+
+2. **Check the approximation is valid before you print a number: `n · p ≥ 10` in each arm.** Below
+   that the normal approximation does not hold and the formula returns arithmetic, not a fact. Site
+   search at 303 users and 1.19% gives `n·p` = 3.6, and the formula duly reports a detectable
+   effect of 209%. **Where `n · p < 10`, or where `mde_rel` comes out above 0.5, write
+   `cannot be powered` in place of the number.** A relative MDE of 144% means "the variation would
+   have to more than double the rate", which nobody needs to three decimal places, and printing it
+   makes a sound verdict look like false precision.
+
+3. **Divide the traffic by the number of arms you will actually run**, not always two. Three arms
+   (control + two variations) is `/3` and a meaningfully worse MDE. State the arm count.
+
+4. **Get the four-week volume from the Daily trend tab, not from `monthly × 28/31`.** That
+   shortcut assumes traffic is uniform, and it rarely is — July had a single day 61% above the
+   median. Use the mean daily users over the range × 28, and if the range contains an obvious spike
+   or outage, say so on the row.
+
+### The KEEP threshold
+
+Three bands, and **these numbers are fixed — do not pick your own bar per run.** A threshold chosen
+in the moment makes the verdict column unreproducible; two runs of this audit have already used 20%
+and 25% and therefore disagreed about which tests survive.
+
+| Detectable relative effect | Verdict | What it means |
+|---|---|---|
+| ≤ 10% | **KEEP** | Properly powered. A normal CRO win shows up. |
+| 10% – 25% | **STRETCH** | Only a large win is provable. A real 8% improvement returns "no significant difference". |
+| > 25%, or cannot be powered | **DROP** | The test cannot answer the question. |
+
+**STRETCH is the band that matters, because most candidates land in it.** On the first real run,
+five of seven survivors sat between 16.4% and 19.1% — all comfortably "KEEP" under a 20% bar, while
+none of them could have proven the kind of uplift the team would actually expect from the change.
+Calling those the same thing as a 4.4% MDE hides the whole problem. A two-band pass/fail always
+resolves to "nearly everything passed", which is how an audit ends up recommending tests that
+cannot conclude.
+
+For every STRETCH row, say in the reason column what would move it to KEEP. It is usually one of
+three things: a longer run, a pooled segment (all PDPs rather than one), or a primary metric further
+up the funnel where the base rate is higher — a 55% add-to-cart step needs a fraction of the traffic
+a 1.4% purchase rate does, which is exactly why the two checkout-step candidates are the only clean
+KEEPs on that run.
+
+**Every candidate — kept, stretch or dropped — gets a row on the Opportunities tab with its gap,
+its volume, its MDE arithmetic, and the verdict.** The dropped list is not waste; it is half of what
+the team is reviewing.
 
 Rank what survives on: size of the measured gap × traffic affected × how directly it touches the
 primary conversion.
 
 ## Step 5 — Design the tests
 
-For each surviving opportunity, write a test in the house format:
+Write a test for every KEEP and every STRETCH candidate — a STRETCH is a real test with a caveat,
+not a reject. Nothing marked DROP or `cannot be powered` gets a hypothesis. In the house format:
 
 - **Hypothesis**, as IF / THEN / BECAUSE. The BECAUSE must cite the finding it came from, with the
   number. "BECAUSE only 24% of mobile sessions scroll far enough to see all products" — not
@@ -296,7 +371,8 @@ For each surviving opportunity, write a test in the house format:
 - **Test type** (usually AB Test), **Pages**, **Audience**, **Primary metric**,
   **Secondary metrics** (bounce rate and the downstream conversion, so you catch a win that moves
   the top of the funnel and breaks the bottom).
-- **Expected MDE** from Step 4.
+- **Expected MDE** from Step 4, and its verdict, so a STRETCH test cannot be read as comfortably
+  powered once it is out of the Opportunities tab.
 
 Every test must trace back to the data: its row on the Hypotheses tab names the workbook tab (and
 the row or segment on it) that motivated it, and the BECAUSE quotes a number that appears there.
@@ -315,8 +391,8 @@ One `.xlsx`, built with openpyxl, in this tab order:
 | **README** | Client and property name, GA4 property id, measurement id, date range, the property totals for the range, and a one-line index of every tab. Nothing else — no data-source line, no funnel-type or starting-URL echo, no who-confirmed-it line, no derivation note, no generated timestamp. The reviewer knows how the workbook was made; the README is there to say what is in it |
 | **Funnel** | The confirmed funnel as a table (step, event, where it fires, URL), then the step-to-step drop-off tables: whole property, by device, by channel group, by top landing pages |
 | **One tab per Step 3 slice** | The full table for that slice, named plainly (`Landing pages`, `LP x Device`, `LP x Channel`, `Sources`, `Campaigns`, `Devices`, `New vs returning`, `Countries`, `Daily trend`…) |
-| **Opportunities** | Every candidate from Step 4, kept and dropped: the measured gap, the volume behind it, the MDE arithmetic (sessions per variant, detectable effect), the verdict, and the reason |
-| **Hypotheses** | One row per surviving test: name, IF, THEN, BECAUSE, evidence (tab + row/segment it traces to), pages, audience, primary metric, secondary metrics, expected MDE, the seven priority sub-scores, total, rank |
+| **Opportunities** | Every candidate from Step 4 — KEEP, STRETCH and DROP: the measured gap, the segment's users over the range, users per arm, the arm count, the baseline per-user rate, `n·p`, the detectable relative effect (or `cannot be powered`), the verdict, and the reason. The context line states the constant, the confidence and power, and the unit |
+| **Hypotheses** | One row per KEEP or STRETCH test: name, IF, THEN, BECAUSE, evidence (tab + row/segment it traces to), pages, audience, primary metric, secondary metrics, expected MDE, its Step 4 verdict, the seven priority sub-scores, total, rank |
 
 Rules for the build:
 
@@ -401,7 +477,10 @@ Three traps in here, all of which produce a wrong width silently:
 Then **verify before handover (ADR-0006)**: reopen the file with openpyxl and check that every
 expected tab exists and holds the rows you meant to write, spot-check at least three numbers
 against the original tool responses, and confirm every evidence pointer on the Hypotheses tab names
-a tab that actually exists. **Check the widths too** — for every sheet, assert that each column's
+a tab that actually exists. **Recompute the MDE on at least two Opportunities rows from the inputs
+printed on that row** and confirm they match what you wrote — the formula is easy to apply to the
+wrong `p` — and confirm no row prints a detectable effect where `n·p < 10` or the result exceeds
+0.5. **Check the widths too** — for every sheet, assert that each column's
 width is at least the longest `display_len` in it (or that the column wraps and is at `MAX_W`).
 That check costs nothing and catches a tab you built before adding a long row. Fix and rebuild
 anything that fails; never deliver a workbook you have not reopened.
