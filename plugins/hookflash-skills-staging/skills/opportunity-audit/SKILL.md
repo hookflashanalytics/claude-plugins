@@ -403,19 +403,19 @@ Rules for the build:
   autofilter on every data tab. No charts this phase — the review is about the data, and a
   dependable table beats a decorative one.
 - **Every column is wide enough for its contents. No truncated cells anywhere in the workbook.**
-  openpyxl has no autofit, so width is something you compute — see [Column
-  widths](#column-widths) below. This is not cosmetic: a cut-off cell in the middle of a review
-  workbook is read as a mistake in the data.
+  openpyxl has no autofit, so width is something you compute — see [Column widths and context
+  lines](#column-widths-and-context-lines) below. This is not cosmetic: a cut-off cell in the middle
+  of a review workbook is read as a mistake in the data.
 - Every data tab carries one context line above the header: what the tab is, its date range, and
   any truncation or thresholding that applies to it (`Top 100 of 8,077 landing pages by sessions`).
   Not the source tool — every tab has the same source and repeating it fifteen times is noise.
 - **Do not trim, round away, or top-N a tab to make it tidy.** Comprehensiveness is what the team
   asked to see.
 
-### Column widths
+### Column widths and context lines
 
-Run this over **every sheet** as the last thing before saving. Do not hand-pick widths per tab —
-they drift, and the tab you forget is the one that gets forwarded.
+Run both of these over **every sheet** as the last thing before saving, widths first. Do not
+hand-pick widths per tab — they drift, and the tab you forget is the one that gets forwarded.
 
 ```python
 from openpyxl.utils import get_column_letter
@@ -437,11 +437,14 @@ def display_len(cell):
         return len(f"{v:,.{dp}f}") + (2 if "£" in fmt or "$" in fmt else 0)
     return max(len(line) for line in str(v).split("\n"))
 
+def banner_rows_of(ws):
+    """Rows with a single populated cell: the context line and any section labels.
+    They are prose, not table cells, and are handled separately below."""
+    return {r[0].row for r in ws.iter_rows()
+            if sum(c.value is not None for c in r) <= 1}
+
 def fit_columns(ws):
-    # Rows with a single populated cell are banners (the context line, section
-    # labels). They are meant to spill; measuring them stretches column A to 200.
-    banner_rows = {r[0].row for r in ws.iter_rows()
-                   if sum(c.value is not None for c in r) <= 1}
+    banner_rows = banner_rows_of(ws)      # measuring these stretches column A to 200
     for col in ws.columns:
         idx = col[0].column
         widest = 0
@@ -461,7 +464,53 @@ def fit_columns(ws):
                     c.alignment = Alignment(wrap_text=True, vertical="top")
 ```
 
-Three traps in here, all of which produce a wrong width silently:
+Then treat the context lines, **after** the widths are final — the treatment depends on how much
+room they have to spill into:
+
+```python
+import math
+LINE_H = 15.0   # points per line of text at 11pt
+
+def fit_banner_rows(ws, last_col):
+    """A context line either spills across the empty cells or is merged and given
+    the height it needs. What it must never do is wrap inside one narrow column."""
+    room = sum(ws.column_dimensions[get_column_letter(i)].width or 8.43
+               for i in range(1, last_col + 1))
+    for r in sorted(banner_rows_of(ws)):
+        cell = next((c for c in ws[r] if c.value is not None), None)
+        if cell is None:
+            continue
+        text = str(cell.value)
+        if len(text) <= room * 0.95:
+            cell.alignment = Alignment(wrap_text=False, horizontal="left", vertical="center")
+            ws.row_dimensions[r].height = None          # one line, Excel's default
+        else:
+            ws.merge_cells(start_row=r, start_column=cell.column,
+                           end_row=r, end_column=last_col)
+            cell.alignment = Alignment(wrap_text=True, horizontal="left", vertical="top")
+            span = sum(ws.column_dimensions[get_column_letter(i)].width or 8.43
+                       for i in range(cell.column, last_col + 1))
+            ws.row_dimensions[r].height = math.ceil(len(text) / max(span * 0.95, 1)) * LINE_H
+```
+
+**The failure this fixes:** the context cell inherits `wrap_text` from the header styling, the
+column beside it is 9 characters wide because it holds a `Rank` integer, and a 150-character
+sentence stacks itself one word per line inside that column while the row height shows three of
+them. It reads as a formatting accident, which is what the first runs looked like on Hypotheses and
+Opportunities.
+
+Two rules that go with the code:
+
+- **Run `fit_columns` on every sheet first, then `fit_banner_rows`.** The spill room is the sum of
+  the final column widths, so the order is not optional.
+- **Keep a context line to one sentence.** Spilling only works while the text is shorter than the
+  table is wide, and most tabs are narrower than they look — 11 of the 17 tabs on the first run had
+  a context line longer than the whole table. The Opportunities line was 293 characters and the
+  Hypotheses line 388; those two fit only because those tabs are unusually wide. If a tab needs a
+  paragraph of method explanation, that paragraph belongs in the README, and the tab gets the one
+  line that says what it is.
+
+Three traps in the width code, all of which produce a wrong width silently:
 
 - **Measure the rendered string, not the stored value.** A conversion rate stored as
   `0.01934489093666161` and formatted `0.0%` displays as `1.9%` — four characters, not twenty.
@@ -470,9 +519,10 @@ Three traps in here, all of which produce a wrong width silently:
 - **Skip the banner rows.** The context line above each header is one long sentence in column A
   with nothing beside it. It is supposed to spill across the empty cells; measuring it makes
   column A absurd and every other column look cramped by comparison.
-- **Do not set row heights on wrapped columns.** Excel auto-fits the height of a wrapped row only
-  while the height is unset. Set it explicitly — even to something generous — and the text is
-  clipped instead. Merged cells never auto-fit either, so do not merge in data tables.
+- **Do not set row heights on wrapped data columns.** Excel auto-fits the height of a wrapped row
+  only while the height is unset. Set it explicitly — even to something generous — and the text is
+  clipped instead. The merged context line is the one exception, and only because merged cells never
+  auto-fit at all, so its height has to be computed. Never merge inside a data table.
 
 Then **verify before handover (ADR-0006)**: reopen the file with openpyxl and check that every
 expected tab exists and holds the rows you meant to write, spot-check at least three numbers
@@ -481,8 +531,10 @@ a tab that actually exists. **Recompute the MDE on at least two Opportunities ro
 printed on that row** and confirm they match what you wrote — the formula is easy to apply to the
 wrong `p` — and confirm no row prints a detectable effect where `n·p < 10` or the result exceeds
 0.5. **Check the widths too** — for every sheet, assert that each column's
-width is at least the longest `display_len` in it (or that the column wraps and is at `MAX_W`).
-That check costs nothing and catches a tab you built before adding a long row. Fix and rebuild
+width is at least the longest `display_len` in it (or that the column wraps and is at `MAX_W`), and
+that every context line is either unwrapped with no row height or merged with one — a wrapped
+banner with no height set is the crammed-cell bug. Those checks cost nothing and catch a tab you
+built before adding a long row. Fix and rebuild
 anything that fails; never deliver a workbook you have not reopened.
 
 ## Deliver
