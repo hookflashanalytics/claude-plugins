@@ -324,19 +324,87 @@ Rules for the build:
   volumes as integers with `#,##0` — the team will want to re-derive and re-sort, and a column of
   text can do neither.
 - Formatting is light and consistent: bold header row (white on blue `#2F6BED`), freeze the header,
-  autofilter on every data tab, sensible column widths. No charts this phase — the review is about
-  the data, and a dependable table beats a decorative one.
+  autofilter on every data tab. No charts this phase — the review is about the data, and a
+  dependable table beats a decorative one.
+- **Every column is wide enough for its contents. No truncated cells anywhere in the workbook.**
+  openpyxl has no autofit, so width is something you compute — see [Column
+  widths](#column-widths) below. This is not cosmetic: a cut-off cell in the middle of a review
+  workbook is read as a mistake in the data.
 - Every data tab carries one context line above the header: what the tab is, its date range, and
   any truncation or thresholding that applies to it (`Top 100 of 8,077 landing pages by sessions`).
   Not the source tool — every tab has the same source and repeating it fifteen times is noise.
 - **Do not trim, round away, or top-N a tab to make it tidy.** Comprehensiveness is what the team
   asked to see.
 
+### Column widths
+
+Run this over **every sheet** as the last thing before saving. Do not hand-pick widths per tab —
+they drift, and the tab you forget is the one that gets forwarded.
+
+```python
+from openpyxl.utils import get_column_letter
+from openpyxl.styles import Alignment
+
+MIN_W, MAX_W = 9, 55   # characters; past MAX_W a column wraps instead of stretching
+
+def display_len(cell):
+    """Width of the value AS EXCEL WILL SHOW IT, not as Python stores it."""
+    v = cell.value
+    if v is None:
+        return 0
+    fmt = cell.number_format or "General"
+    if isinstance(v, (int, float)) and not isinstance(v, bool) and fmt != "General":
+        if fmt.rstrip('"').endswith("%"):
+            dp = len(fmt.split(".")[1].rstrip('%"')) if "." in fmt else 0
+            return len(f"{v * 100:.{dp}f}%")
+        dp = len(fmt.split(".")[1]) if "." in fmt else 0
+        return len(f"{v:,.{dp}f}") + (2 if "£" in fmt or "$" in fmt else 0)
+    return max(len(line) for line in str(v).split("\n"))
+
+def fit_columns(ws):
+    # Rows with a single populated cell are banners (the context line, section
+    # labels). They are meant to spill; measuring them stretches column A to 200.
+    banner_rows = {r[0].row for r in ws.iter_rows()
+                   if sum(c.value is not None for c in r) <= 1}
+    for col in ws.columns:
+        idx = col[0].column
+        widest = 0
+        for c in col:
+            if c.row in banner_rows:
+                continue
+            n = display_len(c)
+            if c.font and c.font.bold:
+                n = int(n * 1.15)      # bold renders wider than regular
+            widest = max(widest, n)
+        if widest == 0:
+            continue
+        ws.column_dimensions[get_column_letter(idx)].width = min(max(widest + 2, MIN_W), MAX_W)
+        if widest + 2 > MAX_W:          # prose column: wrap rather than run off screen
+            for c in col:
+                if c.row not in banner_rows:
+                    c.alignment = Alignment(wrap_text=True, vertical="top")
+```
+
+Three traps in here, all of which produce a wrong width silently:
+
+- **Measure the rendered string, not the stored value.** A conversion rate stored as
+  `0.01934489093666161` and formatted `0.0%` displays as `1.9%` — four characters, not twenty.
+  Sizing off `len(str(value))` gives you a column six times too wide, and it is why widths and
+  number formats have to be applied *before* fitting.
+- **Skip the banner rows.** The context line above each header is one long sentence in column A
+  with nothing beside it. It is supposed to spill across the empty cells; measuring it makes
+  column A absurd and every other column look cramped by comparison.
+- **Do not set row heights on wrapped columns.** Excel auto-fits the height of a wrapped row only
+  while the height is unset. Set it explicitly — even to something generous — and the text is
+  clipped instead. Merged cells never auto-fit either, so do not merge in data tables.
+
 Then **verify before handover (ADR-0006)**: reopen the file with openpyxl and check that every
 expected tab exists and holds the rows you meant to write, spot-check at least three numbers
 against the original tool responses, and confirm every evidence pointer on the Hypotheses tab names
-a tab that actually exists. Fix and rebuild anything that fails; never deliver a workbook you have
-not reopened.
+a tab that actually exists. **Check the widths too** — for every sheet, assert that each column's
+width is at least the longest `display_len` in it (or that the column wraps and is at `MAX_W`).
+That check costs nothing and catches a tab you built before adding a long row. Fix and rebuild
+anything that fails; never deliver a workbook you have not reopened.
 
 ## Deliver
 
