@@ -20,16 +20,16 @@ nothing still goes in the workbook — it is evidence of what was checked.
 
 ## Prerequisites
 
-1. **Tether connected** with the Tapa tools available. Check `tapa_funnel_get` is in your tool
-   list. If not, the user needs the `hookflash-skills` plugin installed and Tether authorised —
-   say so and stop.
+1. **Tether connected** with the Tapa tools available. Check `answer_client_data_question` and
+   `tapa_ra_list_ga4_properties` are in your tool list. If not, the user needs the
+   `hookflash-skills` plugin installed and Tether authorised — say so and stop.
 2. **GA4 access.** These tools run as the user's own Google grant. If a call returns a
    reconnect error, send them to `tapa.hookflash.co.uk/connect`.
 3. **A session that can write files** — the workbook is built locally with Python + openpyxl
    (Cowork or Claude Code). If you cannot create files in this session, say so and stop rather
    than delivering tables pasted into chat.
-4. **A browser you can drive** — only for a first-time audit on a client (Step 2). Later audits
-   read the stored funnel spec and need no browser at all.
+4. **A browser you can drive** — every audit maps the funnel by walking it (Step 2). If there is
+   no browser, there is a defined degradation below; do not abandon the audit.
 
 ## Safety rules that are not negotiable
 
@@ -62,38 +62,60 @@ abandon the walk because a particular browser is missing.**
   The purchase risk lives in *clicking*, and you are not clicking.
 - **Neither available** — do not block. Ask the user to walk the funnel in their own browser and
   send you the step URLs and a screenshot per step, then carry on at Step 2c. You lose the event
-  trace, so lean on the GA4 evidence in 2a and mark the spec `confirmed: false` until they check it.
+  trace, so lean harder on the GA4 evidence in 2a, and say on the README tab that the funnel was
+  confirmed from the user's account of the walk rather than from observed tag traffic.
 
-## Step 1 — Ground the property and check for a stored spec
+## Step 1 — Ground the audit
 
-Ask only for what you cannot look up. You need a GA4 property and a date range.
+You need four things before you touch the data: a **GA4 property**, a **URL to start from**, **what
+converting means on this site**, and a **date range**. Look up what you can, then ask once for the
+rest.
 
 1. Resolve the property. `tapa_ra_list_ga4_properties` lists what the user can reach. If they gave
    you a measurement ID or a site URL instead, `tapa_pf_find` resolves it.
-2. **`tapa_funnel_get` with the property id.** This decides how much work the audit is:
-   - **A confirmed spec exists** → skip Step 2 entirely. Go to Step 3.
-   - **An unconfirmed spec exists** → show it to the user, ask them to confirm or correct it, then
-     `tapa_funnel_put` with `confirmed: true`. Skip the walk.
-   - **Nothing stored** → Step 2.
+2. **Ask for whatever the user has not already given you — in one message, not a series of them.**
+   Two things:
+   - **The URL to start the funnel walk from.** Usually the homepage, but plenty of clients want
+     the audit aimed at a campaign lander, a category, or one product line. Starting in the wrong
+     place wastes the walk.
+   - **What kind of funnel this is: ecommerce, lead gen, or something else.** If something else,
+     ask them to name the converting action in a few words — book a viewing, start an application,
+     register an account, donate.
+
+   Ask even when the site looks obvious. Inferring the funnel from the domain is the single biggest
+   way this audit goes wrong: it maps a plausible funnel that is not the one the client is judged
+   on, and every number after that is answering the wrong question. Two sentences from the user
+   removes it. If they have already said both things in their brief, do not ask again.
 3. Default the date range to the **last complete calendar month**. Record which range you used on
    the workbook's README tab and on every data tab.
 
-## Step 2 — Map the real funnel (first audit for a client only)
+## Step 2 — Map the real funnel
 
 A GA4 property id does not tell you what converting means. `quote_start`, `begin_checkout`,
 `generate_lead`, `form_submit_step3` — you cannot guess which matter or what order they come in,
-and getting it wrong invalidates the whole audit. So derive it, then have a human confirm it once,
-then store it forever.
+and getting it wrong invalidates the whole audit. So derive it from the data, walk it, and have the
+user confirm it before you pull anything.
+
+**Every audit maps the funnel fresh.** Nothing is stored between runs and nothing is looked up.
+Opportunity audits are a new-client exercise, run about once per client, so there is almost never a
+previous spec to reuse — and a spec that has been sitting around since the site was last redesigned
+is worse than no spec, because it is trusted without being checked.
 
 ### 2a. Derive candidates from GA4
 
-- **If the standard ecommerce events are present** (`view_item`, `add_to_cart`, `begin_checkout`,
-  `purchase`) the funnel is those, in that order. You are done deriving — go to 2c.
-- **Otherwise** (lead gen, or custom ecommerce): list event names with
+The funnel type the user gave you in Step 1 says which way to go. It is a starting point, not the
+answer: confirm it against the events actually present, and if the data flatly contradicts what
+they said, tell them rather than quietly following either one.
+
+- **Ecommerce, standard events present** (`view_item`, `add_to_cart`, `begin_checkout`, `purchase`)
+  — the funnel is those, in that order. You are done deriving; go to 2c.
+- **Lead gen, or ecommerce on custom events, or something else** — list event names with
   `tapa_ra_list_ga4_event_names`, then use `answer_client_data_question` to get each event's
   **volume** and — this is the useful bit — **which page paths it fires on**. An event's page
   distribution tells you empirically where in the journey it sits, which is more reliable than its
-  name and more reliable than asking the client, who often does not know.
+  name and more reliable than asking the client, who often does not know. Read the candidates
+  against the converting action the user named: the event that marks *that* action is the bottom of
+  the funnel, and the steps are what reliably precedes it.
 - **Check the property's key events** (`get_ga4_property_config`). What the client marked as a
   conversion is the strongest single signal you have.
 - Infer order from volume containment: if A fires on 100% of sessions, B on 26% and C on 17%, and C
@@ -105,7 +127,7 @@ You need each step's URL and layout, and confirmation that the events fire where
 click through yourself — bot protection challenges automated walks, and a human decides what is
 safe to submit.
 
-1. Open the site's homepage in whichever browser this session has (see [Which
+1. Open the starting URL from Step 1 in whichever browser this session has (see [Which
    browser](#which-browser)).
 2. Tell the user, in these terms: *"Walk the funnel the way a customer would, from here to just
    before the final submit. **Pause two or three seconds on each page** so I can capture what
@@ -143,14 +165,17 @@ safe to submit.
      downstream is wrong.
 4. As they go, capture a screenshot of each step and note the URL.
 
-### 2c. Confirm and store
+### 2c. Confirm before you pull
 
 Show the user the derived funnel as a short table — step, event, where it fires, the URL — plus the
 page-type patterns you propose (home, product lander, PLP, PDP, blog…). Ask them to confirm or
-correct it. **This is the one place you must ask.** Then `tapa_funnel_put` with `confirmed: true`.
+correct it.
 
-Only set `confirmed: true` when a human has actually said yes. Every later audit trusts a confirmed
-spec without asking again, so a confirmed guess quietly corrupts every audit after it.
+**Wait for a yes.** This is the second and last thing you ask them, and it is the one that protects
+the audit: everything from Step 3 on is measured against this funnel, so a wrong step here does not
+produce a slightly-off workbook, it produces a confident workbook about the wrong journey. Carry the
+confirmed funnel forward in this session and record it on the workbook's Funnel tab. Nothing is
+saved for next time.
 
 ## Step 3 — The comprehensive GA4 pass
 
@@ -241,8 +266,8 @@ One `.xlsx`, built with openpyxl, in this tab order:
 
 | Tab | Contents |
 |---|---|
-| **README** | Property and id, date range, who confirmed the funnel spec and when, a one-line index of every tab, a summary of any data-quality flags, and the generated timestamp |
-| **Funnel** | The stored funnel spec as a table (step, event, where it fires, URL), then the step-to-step drop-off tables: whole property, by device, by channel group, by top landing pages |
+| **README** | Property and id, date range, the starting URL and funnel type the user gave, who confirmed the funnel and when, a one-line index of every tab, a summary of any data-quality flags, and the generated timestamp |
+| **Funnel** | The confirmed funnel as a table (step, event, where it fires, URL), then the step-to-step drop-off tables: whole property, by device, by channel group, by top landing pages |
 | **One tab per Step 3 slice** | The full table for that slice, named plainly (`Landing pages`, `LP x Device`, `LP x Channel`, `Sources`, `Campaigns`, `Devices`, `New vs returning`, `Countries`, `Daily trend`…) |
 | **Data quality** | Every plausibility flag, sampling/thresholding note, and `(not set)`/Unassigned bucket, each with where it was seen and what it means for reading the data |
 | **Opportunities** | Every candidate from Step 4, kept and dropped: the measured gap, the volume behind it, the MDE arithmetic (sessions per variant, detectable effect), the verdict, and the reason |
@@ -271,12 +296,11 @@ not reopened.
 
 Hand over the workbook file, and in chat:
 
-- the funnel used, and whether it was stored already or mapped and confirmed this run
+- the funnel used, and that the user confirmed it before the pull
 - what was pulled: the count of slices and rows, and anything that came back truncated or sampled
 - the headline findings, briefly — three to five, each with its number
 - tests proposed and candidates dropped, as counts
 - any data-quality flags worth a sentence
-- a note that the funnel spec is stored, so the next audit for this client skips the walk
 
 Say plainly that this phase produces no deck: the workbook **is** the deliverable, for the
 experimentation team to review the foundation the deck will later stand on.
@@ -285,7 +309,9 @@ experimentation team to review the foundation the deck will later stand on.
 
 - **Do not stop and offer the user a menu when a tool is unavailable.** A missing browser has a
   defined degradation above. Take it, finish the audit, and report what was missing at handover.
-  Ask only when proceeding would be *unsafe* or would make the output *wrong*.
+  Ask only when proceeding would be *unsafe* or would make the output *wrong* — which is exactly
+  the two asks this skill does have: the starting URL and funnel type in Step 1, and the funnel
+  confirmation in 2c. Those two are required. Everything else you work out yourself.
 - **Never invent behavioural evidence.** You have GA4 and screenshots. You do not have scroll maps,
   click maps or session recordings. If a hypothesis needs "users don't scroll", either get it from a
   GA4 `scroll` event or say the evidence is missing.
