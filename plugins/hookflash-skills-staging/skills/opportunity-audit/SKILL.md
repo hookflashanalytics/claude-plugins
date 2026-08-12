@@ -55,10 +55,10 @@ These are hard limits, not preferences:
   have reached the stop line.
 - **Never sign in, create an account, or accept terms.** If the funnel requires a login, stop and
   hand that step to the user.
-- **Tell the user before you start** which funnel you are about to walk and where you will stop,
-  and let them confirm. Agencies generally have permission to poke around a client's funnel; it is
-  still better raised in advance. Confirmation given for one client's site does not carry to the
-  next.
+- **Say what you are doing, then do it.** Post one line naming the route and the stop line, and
+  start walking. Do not wait for permission: the user asked for this audit, agencies have
+  permission to use their clients' funnels, and nothing before the stop line needs a human
+  decision. The stop line is what keeps the walk safe, not a confirmation prompt.
 
 **Your walk fires real events into the client's GA4** — a `view_item`, an `add_to_cart`, probably a
 `begin_checkout`, in the property you are about to analyse. One session against a month of traffic
@@ -74,10 +74,11 @@ abandon the walk because a particular browser is missing.**
   clicking. It carries none of the user's logged-in sessions or saved cards, so a checkout page
   cannot be pre-filled with real payment details.
 - **Claude in Chrome, if that is all there is** — acceptable, with one extra precaution. It is the
-  user's real browser: saved cards, saved addresses, and a possible existing basket. Say so once,
-  and ask them to open a fresh or private window before you start, especially if the client's site
-  is one they actually shop on. Then the stop rule above is what stands between the walk and a real
-  order, so treat it as absolute rather than as guidance.
+  user's real browser: saved cards, saved addresses, and a possible existing basket. Say so once as
+  you start — a statement, not a question — and note that a private window is cleaner if the client
+  is a site they actually shop on. Carry on without waiting for an answer. Here the stop rule is
+  the only thing standing between the walk and a real order, so treat it as absolute rather than as
+  guidance.
 - **Neither available** — do not block. Ask the user to walk the funnel in their own browser and
   send you the step URLs and a screenshot per step, then carry on at Step 2c. You lose the event
   trace, so lean harder on the GA4 evidence in 2a, and say at handover that the funnel was
@@ -149,8 +150,8 @@ often stalls entirely when they step away.
 
 1. Open the starting URL from Step 1 in whichever browser this session has (see [Which
    browser](#which-browser)).
-2. Tell the user what you are about to do, in one line: the route you will take and where you will
-   stop. Wait for their go-ahead, then walk it.
+2. Post one line saying the route you are taking and where you will stop — then start walking in
+   the same turn. It is a note to the user, not a question to them, so do not end the turn on it.
 3. **Follow the route for the funnel type.** These are the shapes; adapt to the site in front of
    you rather than forcing it to match.
 
@@ -357,9 +358,10 @@ experimentation team to review the foundation the deck will later stand on.
 - **Do not stop and offer the user a menu when a tool is unavailable.** A missing browser has a
   defined degradation above. Take it, finish the audit, and report what was missing at handover.
   Ask only when proceeding would be *unsafe* or would make the output *wrong* — which is exactly
-  the three asks this skill does have: the starting URL and funnel type in Step 1, the go-ahead
-  before the walk in 2b, and the funnel confirmation in 2c. Those three are required. Everything
-  else you work out yourself — including the whole route through the funnel.
+  the two asks this skill does have: the starting URL and funnel type in Step 1, and the funnel
+  confirmation in 2c. Those two are required and there is no third. In particular **do not ask
+  permission to start the walk** — announce it and go. Everything else you work out yourself,
+  including the whole route through the funnel.
 - **Never invent behavioural evidence.** You have GA4 and screenshots. You do not have scroll maps,
   click maps or session recordings. If a hypothesis needs "users don't scroll", either get it from a
   GA4 `scroll` event or say the evidence is missing.
