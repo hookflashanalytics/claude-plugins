@@ -208,18 +208,25 @@ If the property, the funnel walk, or the user's brief suggests another split mat
 client (site search use, logged-in state, a promo parameter), pull it too and give it a tab. The
 list above is the floor, not the ceiling.
 
-Then run these checks before you interpret anything:
+Then run these checks before you interpret anything. **These are gates on what you may conclude,
+not a deliverable of their own** — the workbook has no data-quality tab. What each check produces
+is a disqualification (a number that cannot become a hypothesis) and a sentence at handover.
 
 - **Plausibility.** Flag any rate that is impossible (>100%), any two near-identical pages with a
   wildly different rate (a 4x gap between `/car-insurance` and `/insurance/car` is a tracking or
-  redirect artefact far more often than a UX finding), and any step whose completion rate exceeds
-  the step before it. **Report these as data-quality findings on the Data quality tab. Do not
-  write a test hypothesis on top of one.** This is the single biggest way an automated audit
-  embarrasses itself.
-- **Sampling and thresholding.** If a response came back sampled or thresholded, record that on the
-  slice's tab and on the Data quality tab. Do not quietly present a sampled number as fact.
-- **`(not set)` and Unassigned.** Report the bucket rather than dropping it; a large one is itself
-  a finding.
+  redirect artefact far more often than a UX finding), any step whose completion rate exceeds the
+  step before it, and any segment whose average order value or revenue per session is wildly out of
+  line with the rest (usually cross-property or partial tracking). **A flagged number is
+  disqualified: it does not become an opportunity and it does not become a hypothesis.** This is
+  the single biggest way an automated audit embarrasses itself.
+- **Sampling, thresholding and truncation.** If a response came back sampled, thresholded or
+  row-limited, say so in the context line at the top of that slice's own tab (`Top 100 of 8,077 by
+  sessions`). A top-N presented as a complete table is a lie the reader cannot detect.
+- **`(not set)` and Unassigned.** Keep the bucket in the table rather than dropping it, and if it
+  is large enough to distort how a tab reads, say so in that tab's context line.
+
+Raise every flag from these checks **in chat at handover** (see [Deliver](#deliver)), in plain
+sentences. They matter most for the ones you throw away, so say what you disqualified and why.
 
 ## Step 4 — Find the opportunities, and drop the ones you cannot test
 
@@ -266,10 +273,9 @@ One `.xlsx`, built with openpyxl, in this tab order:
 
 | Tab | Contents |
 |---|---|
-| **README** | Property and id, date range, the starting URL and funnel type the user gave, who confirmed the funnel and when, a one-line index of every tab, a summary of any data-quality flags, and the generated timestamp |
+| **README** | Client and property name, GA4 property id, measurement id, date range, the property totals for the range, and a one-line index of every tab. Nothing else — no data-source line, no funnel-type or starting-URL echo, no who-confirmed-it line, no derivation note, no generated timestamp. The reviewer knows how the workbook was made; the README is there to say what is in it |
 | **Funnel** | The confirmed funnel as a table (step, event, where it fires, URL), then the step-to-step drop-off tables: whole property, by device, by channel group, by top landing pages |
 | **One tab per Step 3 slice** | The full table for that slice, named plainly (`Landing pages`, `LP x Device`, `LP x Channel`, `Sources`, `Campaigns`, `Devices`, `New vs returning`, `Countries`, `Daily trend`…) |
-| **Data quality** | Every plausibility flag, sampling/thresholding note, and `(not set)`/Unassigned bucket, each with where it was seen and what it means for reading the data |
 | **Opportunities** | Every candidate from Step 4, kept and dropped: the measured gap, the volume behind it, the MDE arithmetic (sessions per variant, detectable effect), the verdict, and the reason |
 | **Hypotheses** | One row per surviving test: name, IF, THEN, BECAUSE, evidence (tab + row/segment it traces to), pages, audience, primary metric, secondary metrics, expected MDE, the seven priority sub-scores, total, rank |
 
@@ -281,8 +287,9 @@ Rules for the build:
 - Formatting is light and consistent: bold header row (white on blue `#2F6BED`), freeze the header,
   autofilter on every data tab, sensible column widths. No charts this phase — the review is about
   the data, and a dependable table beats a decorative one.
-- Every data tab states its own date range and its source tool in a line above the header, so a
-  tab forwarded on its own still says what it is.
+- Every data tab carries one context line above the header: what the tab is, its date range, and
+  any truncation or thresholding that applies to it (`Top 100 of 8,077 landing pages by sessions`).
+  Not the source tool — every tab has the same source and repeating it fifteen times is noise.
 - **Do not trim, round away, or top-N a tab to make it tidy.** Comprehensiveness is what the team
   asked to see.
 
@@ -300,7 +307,9 @@ Hand over the workbook file, and in chat:
 - what was pulled: the count of slices and rows, and anything that came back truncated or sampled
 - the headline findings, briefly — three to five, each with its number
 - tests proposed and candidates dropped, as counts
-- any data-quality flags worth a sentence
+- **the data-quality flags from Step 3**, in plain sentences: what looked wrong, where, and what
+  you disqualified because of it. This is the only place they appear, so do not compress them to
+  "some data-quality issues were found"
 
 Say plainly that this phase produces no deck: the workbook **is** the deliverable, for the
 experimentation team to review the foundation the deck will later stand on.
@@ -316,7 +325,7 @@ experimentation team to review the foundation the deck will later stand on.
   click maps or session recordings. If a hypothesis needs "users don't scroll", either get it from a
   GA4 `scroll` event or say the evidence is missing.
 - **Never present a plausibility-flagged number as a finding.** It is a tracking bug until proven
-  otherwise — it belongs on the Data quality tab, not under a hypothesis.
+  otherwise — it is disqualified from the Opportunities and Hypotheses tabs, and reported in chat.
 - **Never compare to "industry benchmarks".** We do not have a benchmark source. Compare segments
   within the property instead.
 - **Never write a hypothesis whose BECAUSE number is not in a data tab.** The traceability is the
