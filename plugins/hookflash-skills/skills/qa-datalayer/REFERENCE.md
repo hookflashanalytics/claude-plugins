@@ -7,15 +7,19 @@
 | `view_item_list` | PLP / collection load. Expect one item per product (the visible variant). Often a load-only event (see caveat below). |
 | `select_item` | Product clicked from a list. Fires just before navigation, capture via the pagehide carry. Often NOT implemented, flag as missing if nothing fires. |
 | `view_item` | PDP load, and again on every variant/option change (use the variant change to capture it live). |
-| `add_to_cart` | Add from PDP and from the mini-bag/drawer, plus any upsell/bundle add. `items` = just the added item. |
-| `view_cart` | Opening the cart page or mini-bag. |
-| `remove_from_cart` | Removing an item, test every control: quantity-decrement, the trash/remove button, and any add-on remove, on both cart page and mini-bag. |
-| `begin_checkout` | Entering checkout. On Shopify this fires inside the checkout sandbox (web pixel). |
-| `add_shipping_info` | Shipping step (Shopify pixel: `checkout_address_info_submitted`). |
-| `add_payment_info` | Payment step (Shopify pixel: `payment_info_submitted`). Stop before paying; do not enter card data. |
-| `purchase` | Order confirmation. Do not test unless the user explicitly authorises a real/test order. |
+| `add_to_cart` | Add from PDP and from the mini-bag/drawer, plus any upsell/bundle add. **Delta event:** `items` = just the added item, `quantity` = units added in that interaction, `value` = `price * quantity` of the added item only. |
+| `view_cart` | Opening the cart page or mini-bag. **Whole-cart event:** every line, `value` = cart total. |
+| `remove_from_cart` | Removing an item, test every control: quantity-decrement, the trash/remove button, and any add-on remove, on both cart page and mini-bag. **Delta event:** `items` = just the removed item, `quantity` = units removed (a stepper decrement is 1; a trash click is the whole line). |
+| `begin_checkout` | Entering checkout. On Shopify this fires inside the checkout sandbox (web pixel). **Whole-cart event.** |
+| `add_shipping_info` | Shipping step (Shopify pixel: `checkout_address_info_submitted`). **Whole-cart event.** |
+| `add_payment_info` | Payment step (Shopify pixel: `payment_info_submitted`). Stop before paying; do not enter card data. **Whole-cart event.** |
+| `purchase` | Order confirmation. Do not test unless the user explicitly authorises a real/test order. **Whole-cart event.** |
 
 Default coverage expectation (when the user has no spec): item events should carry `currency`, `value`, item `id`, `name`, `brand`, `category`, `variant`, `price`, `quantity`. Coupon/discount/tax fields are frequently null pre-checkout. Always prefer the user's own spec over this default.
+
+### Delta vs whole-cart (the most common misjudgement)
+
+`add_to_cart` and `remove_from_cart` report **what moved**, never the cart that it moved into or out of. If the cart already holds 2 x Product X at £10 and the user adds one more, the correct push is `quantity: 1` and `value: 10`. A push carrying `quantity: 3` and `value: 30` there is reporting the resulting cart line, which is a **fail**, not a pass. Every other cart-stage event (`view_cart`, `begin_checkout`, `add_shipping_info`, `add_payment_info`, `purchase`) is the opposite: whole cart, `value` = cart total. See "What `value`, `quantity` and `items` should mean" in SKILL.md for the worked table.
 
 ## events.json schema
 
