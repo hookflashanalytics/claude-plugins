@@ -10,7 +10,7 @@
       "name": "hookflash-skills",
       "source": "./plugins/hookflash-skills",
       "description": "START HERE. Certified Hookflash skills, plus the Tether connection every Hookflash skill needs. Required — install this one even if you were asked to test staging skills.",
-      "version": "0.15.0"
+      "version": "0.15.1"
     },
     {
       "name": "hookflash-skills-staging",

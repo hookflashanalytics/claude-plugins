@@ -34,7 +34,7 @@ Drive the user's connected Chrome, walk an ecommerce funnel, capture each event'
 4. **Identify how this site emits events** (do not assume). Quick probe for: `window.dataLayer` (GTM/GA4), `window.gtag`, Tealium `window.utag`, Adobe `window._satellite` / `window.digitalData`, a Shopify bus (`Shopify.analytics`), or a custom module (scan `Object.keys(window)`). See REFERENCE "Identify how the site emits events". Whichever it is, that JS push is the source of truth for the QA.
 5. Install the capture hook (`scripts/capture_hook.js`) via `javascript_tool`. It wraps every common emitter it finds (`dataLayer.push`, `gtag`, Tealium `utag`, `Shopify.analytics.publish`, and any `window.tracking.*`-style builder) and installs a `pagehide` sessionStorage carry. **Re-install after every navigation** (page load wipes it). Reset with `window.__dlqa = []` before each event you trigger.
 6. Walk the funnel, capturing after each trigger: PLP load (`view_item_list`) -> click a product (`select_item`) -> PDP (`view_item`, + change variant/kit to re-fire) -> add to cart from PDP **and** from the mini-bag/drawer, including any upsell/bundle add (`add_to_cart`) -> open cart/mini-bag (`view_cart`) -> remove from **both** cart page and mini-bag, testing **every** remove control incl. quantity-decrement AND the trash/remove button AND any add-on remove (`remove_from_cart`) -> checkout (`begin_checkout`) -> shipping (`add_shipping_info`) -> payment (`add_payment_info`, **stop before paying**).
-7. For each event record: `source` (Top frame / Web pixel / Not fired); the push (see below); a **tight location screenshot** (see "Location screenshots"); a tight bulleted verdict judged against the dataLayer guide (see "Writing the verdict").
+7. For each event record: `source` (Top frame / Web pixel / Not fired); the push (see below); a **tight location screenshot** (see "Location screenshots"); a tight bulleted verdict judged against the dataLayer guide (see "Writing the verdict", and "What `value`, `quantity` and `items` should mean" before judging any cart event).
 8. Build the report: write `events.json` (schema in REFERENCE) and run `python scripts/build_report.py events.json <screenshots_dir> <out.xlsx>`.
 9. **Verify**: reopen the workbook, confirm every row has push text + a readable screenshot and nothing clips.
 
@@ -70,6 +70,35 @@ You cannot read a sandboxed iframe's runtime memory (the `sandbox` attribute for
    - If you can obtain the **runtime values**, use them.
    - If you cannot (the usual case for a sandbox), reproduce the **object shape from the source** and set every value you cannot read to the string `"(Can't read values in web pixel)"`. Keep the real param **keys** so coverage is still reviewable.
 4. Judge coverage from the code (e.g. a param hardcoded to `null` in the builder means it is not implemented, regardless of cart state). Annotate hardcoded values, e.g. `"null (hardcoded in pixel source)"`.
+
+## What `value`, `quantity` and `items` should mean (read before judging any cart event)
+
+Getting this backwards is the most common QA mistake, so decide which kind of event you are looking at **before** you write a verdict. Two kinds:
+
+**Delta events: `add_to_cart`, `remove_from_cart`.** These describe *the thing that just moved*, not the cart it moved into or out of. What is already in the cart is irrelevant.
+
+- `items` = **only** the item(s) added or removed in that one interaction.
+- `items[].quantity` = **how many units moved in that interaction**, not the resulting line quantity in the cart.
+- `value` = the money that moved: sum of `price * quantity` over those items only. **Not** the cart subtotal, and **not** the cart total after the change.
+
+Worked examples, judge against these:
+
+| Interaction | Correct `quantity` | Correct `value` |
+|---|---|---|
+| Cart already holds 2 x Product X (£10), user adds 1 more | `1` | `10` |
+| Same, but the qty selector was set to 3 before adding | `3` | `30` |
+| Qty stepper on a 3-unit cart line clicked down to 2 | `1` (remove_from_cart) | `10` |
+| Trash / "remove" clicked on a 3-unit cart line | `3` | `30` |
+
+Note the last two rows: the trash button legitimately removes the whole line, so there `quantity` *equals* the line quantity. That is the delta, not the cart state, and it is a pass. A stepper decrement is always `1`.
+
+So: if the cart holds 2 and the user adds 1, `quantity: 3` and `value: 30` are **failures**, not passes. Word it as what it is, e.g. "quantity is 3, the resulting cart line, instead of the 1 unit actually added" or "value is the cart total after the add, not the price of the item added".
+
+**Whole-cart events: `view_cart`, `begin_checkout`, `add_shipping_info`, `add_payment_info`, `purchase`.** These *do* describe the entire cart: `items` = every line, each `quantity` = that line's full quantity, `value` = the cart total. Do not apply the delta rule here.
+
+(`view_item` and `view_item_list` describe what is on screen: the viewed product, or one item per product in the list. `quantity` is usually `1`, and a missing or `1` quantity is not a finding unless the spec asks for it.)
+
+Always defer to the user's own spec if it says something different, and if the spec is silent on this, these are the expectations.
 
 ## Writing the verdict (Pass / Fail column)
 
