@@ -86,27 +86,44 @@ abandon the walk because a particular browser is missing.**
 
 ## Step 1 — Ground the audit
 
-You need four things before you touch the data: a **GA4 property**, a **URL to start from**, **what
-converting means on this site**, and a **date range**. Look up what you can, then ask once for the
-rest.
+You need five things before you touch the data: a **GA4 property**, a **URL to start from**, **what
+converting means on this site**, a **date range**, and **which channel grouping to report on**. Look
+up what you can, then ask once for the rest.
 
 1. Resolve the property. `tapa_ra_list_ga4_properties` lists what the user can reach. If they gave
    you a measurement ID or a site URL instead, `tapa_pf_find` resolves it.
-2. **Ask for whatever the user has not already given you — in one message, not a series of them.**
-   Two things:
+2. **Look up the property's channel groupings before you ask about them.**
+   `list_ga4_metrics_and_dimensions` returns the dimensions *this property* actually has, custom
+   ones included, so it tells you whether a custom channel group exists and what its API name is.
+   Never guess that name — read it from the listing. Look for every dimension whose name or UI name
+   mentions a channel group: the default (`sessionDefaultChannelGroup`), the primary grouping, and
+   any custom grouping the client has built. Then you can ask a specific question instead of a
+   vague one.
+3. **Ask for whatever the user has not already given you — in one message, not a series of them.**
+   Four things:
    - **The URL to start the funnel walk from.** Usually the homepage, but plenty of clients want
      the audit aimed at a campaign lander, a category, or one product line. Starting in the wrong
      place wastes the walk.
    - **What kind of funnel this is: ecommerce, lead gen, or something else.** If something else,
      ask them to name the converting action in a few words — book a viewing, start an application,
      register an account, donate.
+   - **The date range**, offering the last complete calendar month as the default so they can
+     simply accept it. Say the actual dates rather than the words, so a "yes" is unambiguous.
+     Longer ranges make sampling and thresholding more likely, and every extra day lands on the
+     daily tabs, so it is worth them choosing deliberately rather than discovering it later.
+   - **Which channel grouping to report on**, naming what you found in step 2 — "this property has
+     a custom channel group called X as well as GA4's default: default, custom, or both?" If a
+     custom grouping exists, **both** is the default answer and the one to assume if they do not
+     answer that part: a client with a custom grouping generally reads their reports in it, and the
+     default grouping is what makes the numbers comparable to every other audit.
 
    Ask even when the site looks obvious. Inferring the funnel from the domain is the single biggest
    way this audit goes wrong: it maps a plausible funnel that is not the one the client is judged
-   on, and every number after that is answering the wrong question. Two sentences from the user
-   removes it. If they have already said both things in their brief, do not ask again.
-3. Default the date range to the **last complete calendar month**. Record which range you used on
-   the workbook's README tab and on every data tab.
+   on, and every number after that is answering the wrong question. A few sentences from the user
+   removes it. Anything they have already said in their brief, do not ask again — this is one
+   message covering only the gaps.
+4. Record the date range and the channel grouping on the workbook's README tab, and the date range
+   on every data tab.
 
 ## Step 2 — Map the real funnel
 
@@ -230,31 +247,104 @@ step-to-step drop-off.
 | Step-to-step drop-off, whole funnel | Where the leak is |
 | Step-to-step drop-off by device, by channel group, and by top landing pages | Whose leak it is |
 | Each funnel step × device category | Where the volume is vs where the conversion is |
-| Each funnel step × session default channel group | Which traffic gets how deep |
+| Each funnel step × channel group | Which traffic gets how deep |
 | Landing page × sessions × conversions × conversion rate | The pages worth testing at all |
 | Landing page grouped by page type | Which *kind* of page carries the business |
 | Landing page × device | A page that converts on desktop and dies on mobile |
 | Landing page × channel group | The combination effects — often the real finding |
-| Session default channel group × sessions × conversion rate | Which traffic converts |
+| Channel group × sessions × conversion rate | Which traffic converts |
 | Session source/medium × sessions × conversion rate | The grain below channel group — where the paid and referral stories hide |
 | Campaign × sessions × conversion rate (where paid traffic exists) | Which spend lands on which pages |
 | Device category × sessions × conversion rate | The headline device split |
 | New vs returning × sessions × conversion rate | Whether the funnel serves first-time visitors |
 | Country × sessions × conversion rate | Whether one market drags the average |
 | Daily sessions and conversions across the range | Seasonality, launch spikes, tracking gaps |
+| **Daily event counts, top 20 events** | Which behaviours move together, and which day a tracking change landed |
+| **Item name × items viewed / added to cart / purchased** (ecommerce) | Which products lose people, and where |
+
+**Wherever a slice is broken down by channel, use the grouping the user chose in Step 1.** If they
+asked for both, that slice gets **two tabs** — one per grouping, each named for the grouping it
+uses — not one tab with the two mixed. A custom grouping is the client's own definition of their
+traffic and the default is what makes the audit comparable to every other one; they answer different
+questions, so they get different tabs.
+
+### The two tabs from the review
+
+**Daily event counts.** Rank the property's events by volume over the range, drop the ones that
+carry no signal for this purpose, and pull the top 20 that remain, by day:
+
+- **Excluded from the ranking:** `session_start`, `page_view`, `user_engagement`, `begin_checkout`,
+  `add_shipping_info`, `add_payment_info`. The first three swamp any list by construction; the last
+  three are funnel steps that already have their own tabs and their own drop-off analysis.
+- Dates down the rows, one column per event, a total row at the top under the context line, ordered
+  by event volume descending so the widest columns are nearest the dates.
+- This is one `answer_client_data_question` call using `pivots` — `date` down, `eventName` across,
+  `eventCount` as the metric — with the excluded events removed by a `not` dimension filter on
+  `eventName`, and the pivot limited to 20 values ordered by `eventCount`.
+- **A pivot cannot be de-sampled.** If the pivot comes back sampled, re-pull it as a flat
+  `date` × `eventName` × `eventCount` table with `desample` set and build the grid yourself in the
+  workbook — same tab, exact numbers. Only leave it as a sampled pivot if that flat pull also comes
+  back an estimate, and then say so on the tab.
+
+**Item performance** — ecommerce only, skip it for lead gen. `itemName` against `itemsViewed`,
+`itemsAddedToCart` and `itemsPurchased`, full table, with two rates computed in the workbook:
+add-to-cart rate (added ÷ viewed) and purchase rate (purchased ÷ added). Put each rate immediately
+to the right of the count it is derived from, so a reader can follow one product across the row.
+Include the property total as the first row, labelled, so a product's share is readable.
+
+If the property has no item-scoped data — an ecommerce site whose `view_item` events carry no items
+array is common — the tab still exists and its context line says the metrics returned empty and why
+that is a tracking finding, not an absence of products. Do not deliver a blank grid with no
+explanation, and do not quietly drop the tab.
+
+### Ask GA4 for exact numbers, not estimates
+
+**Set `desample` on every slice you pull.** These numbers go into a workbook the client's
+experimentation team will read as fact, and GA4 hands back a sampled estimate in exactly the same
+shape as an exact answer. With `desample` set, a sampled query is re-run across acquisition-cohort
+buckets and summed, which is exact; an unsampled query costs nothing extra, so there is no reason to
+leave it off.
+
+It has two limits worth knowing before you design a query:
+
+- **It only works on additive count metrics.** Ask for `sessions`, `totalUsers`, `keyEvents`,
+  `eventCount`, `itemsViewed` and compute the rates yourself in the workbook. A query that asks GA4
+  for a rate metric directly cannot be de-sampled — you would be adding percentages together — and
+  the tool will tell you it declined. This is the same reason the workbook stores rates as
+  fractions computed from two counts.
+- **`metric_filters` block it**, because GA4 applies them inside each bucket, so a row that only
+  clears the threshold in total would disappear. Pull the rows and filter them yourself.
+
+**Read `data.completeness` on every response and keep it** — one record per slice. It carries
+whether the answer was sampled and how much was read, whether it was de-sampled and whether that
+came out exact, whether rows were **thresholded** (withheld for privacy, so the totals are genuinely
+short), whether a cardinality `(other)` row swallowed the tail, and whether the table was truncated.
+These become the Data completeness tab, and you cannot reconstruct them afterwards.
+
+If a response comes back with **no `completeness` block at all**, the connected Tether predates this
+and cannot tell you. Do not block and do not guess: build the tab with `unknown` in every column,
+and say at handover that this run cannot report sampling because the Tether connection needs
+updating. An `unknown` a reader can see beats a blank that reads as "fine".
 
 **Pull `totalUsers` alongside sessions on every slice, and converting users alongside conversions.**
 Step 4 powers its tests on users, because that is what a test randomises on, and it cannot go back
 for them later without re-running the whole pass. A slice with sessions but no users forces an
 estimate onto every candidate that comes from it.
 
+The item tab is the exception: item metrics are item-scoped, not user-scoped, so there is no
+sensible user count to pair with them and no attempt should be made to invent one. It is a diagnostic
+tab — it says which products lose people — and any test it suggests is powered on the users of the
+pages involved, taken from the landing-page or page-type tabs, never on item counts.
+
 If the property, the funnel walk, or the user's brief suggests another split matters for this
 client (site search use, logged-in state, a promo parameter), pull it too and give it a tab. The
 list above is the floor, not the ceiling.
 
-Then run these checks before you interpret anything. **These are gates on what you may conclude,
-not a deliverable of their own** — the workbook has no data-quality tab. What each check produces
-is a disqualification (a number that cannot become a hypothesis) and a sentence at handover.
+Then run these checks before you interpret anything. **These are judgement gates on what you may
+conclude**, and they are not the same thing as the Data completeness tab: that tab is a mechanical
+record of what GA4 said about each response, while these are your reading of whether a number can
+be believed. What each check produces is a disqualification (a number that cannot become a
+hypothesis) and a sentence at handover.
 
 - **Plausibility.** Flag any rate that is impossible (>100%), any two near-identical pages with a
   wildly different rate (a 4x gap between `/car-insurance` and `/insurance/car` is a tracking or
@@ -263,9 +353,13 @@ is a disqualification (a number that cannot become a hypothesis) and a sentence 
   line with the rest (usually cross-property or partial tracking). **A flagged number is
   disqualified: it does not become an opportunity and it does not become a hypothesis.** This is
   the single biggest way an automated audit embarrasses itself.
-- **Sampling, thresholding and truncation.** If a response came back sampled, thresholded or
-  row-limited, say so in the context line at the top of that slice's own tab (`Top 100 of 8,077 by
-  sessions`). A top-N presented as a complete table is a lie the reader cannot detect.
+- **Sampling, thresholding and truncation.** Every one of these lands on the Data completeness tab
+  from the record you kept above, and anything that changes how a *particular* tab should be read
+  also goes in that tab's own context line (`Top 100 of 8,077 by sessions`). A top-N presented as a
+  complete table is a lie the reader cannot detect. **Thresholded is the one to think hardest
+  about**: those rows are gone, so the totals on that tab are short by an unknown amount and a
+  conversion rate computed from them is not just imprecise but biased. Say so on the tab, and treat
+  a rate from a thresholded segment the way you treat any other implausible number.
 - **`(not set)` and Unassigned.** Keep the bucket in the table rather than dropping it, and if it
   is large enough to distort how a tab reads, say so in that tab's context line.
 
@@ -349,6 +443,14 @@ subtly wrong:
    median. Use the mean daily users over the range × 28, and if the range contains an obvious spike
    or outage, say so on the row.
 
+**Check the completeness of the tab a candidate came from before you power a test on it.** The whole
+calculation is only as good as `n` and `p`. If the tab is marked exact on the Data completeness tab,
+say nothing. If it is sampled and could not be de-sampled, the row's reason column says the volume
+is a GA4 estimate — the verdict usually survives, but a candidate sitting within a percentage point
+of a band boundary should not be presented as if the band were certain. If the tab is thresholded,
+`p` is computed from a numerator and denominator that are both short, so say that in the reason
+column too.
+
 ### The KEEP threshold
 
 Three bands, and **these numbers are fixed — do not pick your own bar per run.** A threshold chosen
@@ -409,9 +511,10 @@ One `.xlsx`, built with openpyxl, in this tab order:
 
 | Tab | Contents |
 |---|---|
-| **README** | Client and property name, GA4 property id, measurement id, date range, the property totals for the range, and a one-line index of every tab. Nothing else — no data-source line, no funnel-type or starting-URL echo, no who-confirmed-it line, no derivation note, no generated timestamp. The reviewer knows how the workbook was made; the README is there to say what is in it |
+| **README** | Client and property name, GA4 property id, measurement id, date range, which channel grouping the audit reports on, the property totals for the range, and a one-line index of every tab. Nothing else — no data-source line, no funnel-type or starting-URL echo, no who-confirmed-it line, no derivation note, no generated timestamp. The reviewer knows how the workbook was made; the README is there to say what is in it |
+| **Data completeness** | One row per data tab, from the records kept in Step 3: rows in the tab, rows GA4 matched, truncated, sampled, % of data read, whether it was de-sampled and whether that came out exact (or why it was skipped), thresholded, `(other)` row present, and a notes column. Second tab deliberately — a caveat you have to scroll to is a caveat nobody reads |
 | **Funnel** | The confirmed funnel as a table (step, event, where it fires, URL), then the step-to-step drop-off tables: whole property, by device, by channel group, by top landing pages |
-| **One tab per Step 3 slice** | The full table for that slice, named plainly (`Landing pages`, `LP x Device`, `LP x Channel`, `Sources`, `Campaigns`, `Devices`, `New vs returning`, `Countries`, `Daily trend`…) |
+| **One tab per Step 3 slice** | The full table for that slice, named plainly (`Landing pages`, `LP x Device`, `LP x Channel`, `Sources`, `Campaigns`, `Devices`, `New vs returning`, `Countries`, `Daily trend`, `Events by day`, `Items`…). Where the user asked for both channel groupings, the two tabs say which is which (`Channel (default)`, `Channel (custom)`) |
 | **Opportunities** | Every candidate from Step 4 — KEEP, STRETCH and DROP: the measured gap, the segment's users over the range, users per arm, the arm count, the baseline per-user rate, `n·p`, the detectable relative effect (or `cannot be powered`), the verdict, and the reason. The context line states the constant, the confidence and power, and the unit |
 | **Hypotheses** | One row per KEEP or STRETCH test: name, IF, THEN, BECAUSE, evidence (tab + row/segment it traces to), pages, audience, primary metric, secondary metrics, expected MDE, its Step 4 verdict, the seven priority sub-scores, total, rank |
 
@@ -421,8 +524,11 @@ Rules for the build:
   volumes as integers with `#,##0` — the team will want to re-derive and re-sort, and a column of
   text can do neither.
 - Formatting is light and consistent: bold header row (white on blue `#2F6BED`), freeze the header,
-  autofilter on every data tab. No charts this phase — the review is about the data, and a
-  dependable table beats a decorative one.
+  autofilter on every data tab.
+- **Charts go on the same tab as the data they plot**, to the right of the table — not on a charts
+  tab of their own. That is the team's explicit preference: the point of a chart here is to be seen
+  while reading the numbers it came from. See [Charts](#charts) below for which tabs get one and how
+  to place it.
 - **Every column is wide enough for its contents. No truncated cells anywhere in the workbook.**
   openpyxl has no autofit, so width is something you compute — see [Column widths and context
   lines](#column-widths-and-context-lines) below. This is not cosmetic: a cut-off cell in the middle
@@ -435,8 +541,10 @@ Rules for the build:
 
 ### Column widths and context lines
 
-Run both of these over **every sheet** as the last thing before saving, widths first. Do not
-hand-pick widths per tab — they drift, and the tab you forget is the one that gets forwarded.
+Run both of these over **every sheet** once the data is written, widths first, and only then add the
+charts — the whole build order is: write every tab → `fit_columns` → `fit_banner_rows` → charts →
+save. Do not hand-pick widths per tab; they drift, and the tab you forget is the one that gets
+forwarded.
 
 ```python
 from openpyxl.utils import get_column_letter
@@ -545,6 +653,89 @@ Three traps in the width code, all of which produce a wrong width silently:
   clipped instead. The merged context line is the one exception, and only because merged cells never
   auto-fit at all, so its height has to be computed. Never merge inside a data table.
 
+### Charts
+
+One chart per tab where a chart says something the table does not, **anchored to the right of the
+table on that same tab**. A chart is a reading aid, not decoration: if the tab is a lookup table
+(`Sources` with 400 rows, `Items` with 90 products), the chart plots the head of it and its title
+says so.
+
+| Tab | Chart | Plotted against |
+|---|---|---|
+| Funnel | Bar, users per step, in funnel order | Never sorted by size — the order *is* the finding |
+| Landing pages, LP x Device, LP x Channel, page types | Bar of sessions, top 15 rows, with conversion rate on a **secondary axis** | A rate against session counts is invisible on one axis |
+| Channel, Sources, Campaigns, Devices, Countries, New vs returning | Bar of sessions with conversion rate on a secondary axis, top 15 | |
+| Daily trend | Line, sessions and conversions by date, conversions on a secondary axis | |
+| Events by day | Line, one series per event, top 8 events only | 20 lines is a scribble; the table still holds all 20 |
+| Items | Bar of items viewed, top 15 products, with add-to-cart rate on a secondary axis | |
+| Opportunities | Bar of the detectable relative effect per candidate, KEEP first | `cannot be powered` rows are left out of the chart and stay in the table |
+| Data completeness, Hypotheses, README | No chart | Neither prose nor a manifest plots |
+
+```python
+from openpyxl.chart import BarChart, LineChart, Reference
+
+TAPA_BLUE, TAPA_INK = "2F6BED", "9AA5B1"
+
+def add_chart(ws, *, kind, header_row, first_row, last_row, cat_col,
+              value_cols, secondary=(), title, anchor_col, number_format=None):
+    """One chart, anchored two columns clear of the table on the same sheet.
+
+    `value_cols`/`secondary` are 1-based column indexes. Anything in `secondary`
+    is drawn as a line on the right-hand axis — a 1.9% rate and a 40,000-session
+    bar cannot share one axis, and forcing them to makes the rate a flat line
+    along zero.
+    """
+    primary = BarChart() if kind == "bar" else LineChart()
+    primary.title = title
+    # Without this the title is drawn INSIDE the plot area and lands on top of
+    # the tick labels.
+    primary.title.overlay = False
+    primary.height, primary.width = 8, 16
+    cats = Reference(ws, min_col=cat_col, min_row=first_row, max_row=last_row)
+
+    for col in value_cols:
+        primary.add_data(Reference(ws, min_col=col, min_row=header_row, max_row=last_row),
+                         titles_from_data=True)
+    primary.set_categories(cats)
+    for series in primary.series:
+        series.graphicalProperties.solidFill = TAPA_BLUE
+        series.graphicalProperties.line.solidFill = TAPA_BLUE
+
+    if secondary:
+        right = LineChart()
+        for col in secondary:
+            right.add_data(Reference(ws, min_col=col, min_row=header_row, max_row=last_row),
+                           titles_from_data=True)
+        right.set_categories(cats)
+        for series in right.series:
+            series.graphicalProperties.line.solidFill = TAPA_INK
+            series.smooth = False
+        right.y_axis.axId = 200          # a second axis needs its own id
+        right.y_axis.title = None
+        right.y_axis.crosses = "max"     # ... and must cross at the far side
+        if number_format:
+            right.y_axis.numFmt = number_format
+        primary += right
+
+    ws.add_chart(primary, f"{get_column_letter(anchor_col)}{header_row}")
+```
+
+Four things that go wrong, in order of how easily they go unnoticed:
+
+- **Anchor charts last, after `fit_columns` and `fit_banner_rows`.** The anchor is a cell reference,
+  so a chart placed before the widths are final ends up sitting on top of the table it belongs to.
+  Two columns clear of the last populated column, at the header row.
+- **A rate on the primary axis is a flat line at zero.** Rates are stored as fractions, so 0.019
+  plotted beside 40,000 has no visible height at all. Any chart mixing a volume and a rate needs the
+  secondary axis, and the rate series needs its `0.0%` format on that axis too.
+- **Plot from the sorted table, and cap the categories.** A bar chart with 400 categories renders as
+  a grey smear. Take the head of the table as the table is already ordered, and put the cap in the
+  title (`Sessions and conversion rate, top 15 of 412 landing pages`) so nobody reads it as the
+  whole picture.
+- **Do not chart a `cannot be powered` row.** There is no number to plot, and openpyxl will happily
+  draw the text as a zero-height bar that reads as "no effect detectable" rather than "not
+  measurable".
+
 Then **verify before handover (ADR-0006)**: reopen the file with openpyxl and check that every
 expected tab exists and holds the rows you meant to write, spot-check at least three numbers
 against the original tool responses, and confirm every evidence pointer on the Hypotheses tab names
@@ -554,8 +745,12 @@ wrong `p` — and confirm no row prints a detectable effect where `n·p < 10` or
 0.5. **Check the widths too** — for every sheet, assert that each column's
 width is at least the longest `display_len` in it (or that the column wraps and is at `MAX_W`), and
 that every context line is either unwrapped with no row height or merged with one — a wrapped
-banner with no height set is the crammed-cell bug. Those checks cost nothing and catch a tab you
-built before adding a long row. Fix and rebuild
+banner with no height set is the crammed-cell bug. **Check the charts exist** — `len(ws._charts)`
+is 1 on every tab the table above says gets one, and 0 on README, Data completeness and Hypotheses;
+a chart that failed to build leaves no error behind, just a tab that looks like the old workbook.
+**Check the Data completeness tab has a row for every data tab in the workbook** and no rows for
+tabs that do not exist: a missing row reads as "that tab was fine". Those checks cost nothing and
+catch a tab you built before adding a long row. Fix and rebuild
 anything that fails; never deliver a workbook you have not reopened.
 
 ## Deliver
@@ -563,7 +758,12 @@ anything that fails; never deliver a workbook you have not reopened.
 Hand over the workbook file, and in chat:
 
 - the funnel used, and that the user confirmed it before the pull
-- what was pulled: the count of slices and rows, and anything that came back truncated or sampled
+- the date range and which channel grouping the tabs use
+- what was pulled: the count of slices and rows
+- **completeness in one or two sentences**, pointing at the tab: how many tabs came back exact, how
+  many were sampled and de-sampled, anything that could not be de-sampled and why, and anything
+  thresholded or truncated. "All 18 tabs exact" is a perfectly good version of this and worth
+  saying — the team asked how they would know, so silence is not an answer
 - the headline findings, briefly — three to five, each with its number
 - tests proposed and candidates dropped, as counts
 - **the data-quality flags from Step 3**, in plain sentences: what looked wrong, where, and what
@@ -578,10 +778,11 @@ experimentation team to review the foundation the deck will later stand on.
 - **Do not stop and offer the user a menu when a tool is unavailable.** A missing browser has a
   defined degradation above. Take it, finish the audit, and report what was missing at handover.
   Ask only when proceeding would be *unsafe* or would make the output *wrong* — which is exactly
-  the two asks this skill does have: the starting URL and funnel type in Step 1, and the funnel
-  confirmation in 2c. Those two are required and there is no third. In particular **do not ask
-  permission to start the walk** — announce it and go. Everything else you work out yourself,
-  including the whole route through the funnel.
+  the asks this skill does have, and no others: **one message in Step 1** covering the starting URL,
+  the funnel type, the date range and the channel grouping (only the parts the brief did not
+  already supply), and **the funnel confirmation in 2c**. In particular **do not ask permission to
+  start the walk** — announce it and go. Everything else you work out yourself, including the whole
+  route through the funnel and every decision about how the workbook is built.
 - **Never invent behavioural evidence.** You have GA4 and screenshots. You do not have scroll maps,
   click maps or session recordings. If a hypothesis needs "users don't scroll", either get it from a
   GA4 `scroll` event or say the evidence is missing.
