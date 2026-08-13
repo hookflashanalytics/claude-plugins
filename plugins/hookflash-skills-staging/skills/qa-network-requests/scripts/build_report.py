@@ -40,6 +40,11 @@ tab it lands on, so it is required:
   "spec_payload": { ... },        # optional explicit override, wins over spec_params.
                                   # Use when the spec-to-vendor mapping is not a lookup.
 
+  "absence_evidence": "68 requests searched via __nqaRequests(), none matching /g/collect.",
+        # REQUIRED whenever "sent" is false. Without it the cell is stamped
+        # "!! UNVERIFIED" and the run prints a warning, because a filtered read
+        # coming back empty is not evidence that nothing was sent.
+
   "count": 2,                              # optional; rendered when > 1 (duplicate tagging)
   "conditions": "Clicked the 'Shop' nav link in the header.",
   "location_image": "nav_shop.png",        # filename inside screenshots_dir
@@ -52,6 +57,8 @@ consent.json = list of objects, one per vendor, optionally preceded by a state o
 {
   "vendor": "Meta",
   "before": "No hits observed",
+  "evidence": "41 requests searched via __nqaRequests(), none matching facebook.com/tr.",
+        # REQUIRED when "before" claims nothing fired, same gate as absence_evidence.
   "signal": "n/a (no consent parameter)",
   "after": "1 hit (PageView)",
   "observation": "No Meta requests were observed before consent was granted.",
@@ -240,9 +247,22 @@ def sheet_name(vendor, used):
 
 
 def request_cell(ev):
-    """method + endpoint + the verbatim URL and body. Verbatim, never trimmed."""
+    """method + endpoint + the verbatim URL and body. Verbatim, never trimmed.
+
+    An absence claim must carry its evidence. A run reported "no pre-consent hits"
+    and "view_item_list never fired" when both were plainly in the network log,
+    because a filtered read came back empty and the null was written up as a
+    finding. Prose telling the model to check harder did not prevent it, so this
+    is a gate (ADR-0006): no `absence_evidence`, no clean-looking cell.
+    """
     if not ev.get("sent", True):
-        return "No request observed"
+        ev_txt = str(ev.get("absence_evidence", "")).strip()
+        if not ev_txt:
+            return ("No request observed\n\n"
+                    "!! UNVERIFIED: no absence evidence was recorded for this row.\n"
+                    "Re-check with window.__nqaRequests() and paste the total number of\n"
+                    "requests searched, or delete this row. Do not hand this over as is.")
+        return "No request observed\n\nEvidence:\n" + ev_txt
     parts = ["%s %s" % (ev.get("method", "GET"), ev.get("endpoint", ""))]
     if ev.get("count") and int(ev["count"]) > 1:
         parts.append("fired %d times for this one interaction" % int(ev["count"]))
@@ -253,7 +273,7 @@ def request_cell(ev):
     return "\n".join(parts)
 
 
-def vendor_sheet(wb, vendor, events, shots_dir, used_names):
+def vendor_sheet(wb, vendor, events, shots_dir, used_names, unverified):
     ws = wb.create_sheet(sheet_name(vendor, used_names))
     header(ws, EVENT_HEADERS, EVENT_COLS)
     tab = VENDOR_FILLS.get(str(vendor).strip().lower())
@@ -294,6 +314,9 @@ def vendor_sheet(wb, vendor, events, shots_dir, used_names):
         # A spec param the hit is missing is the point of the column: tint it.
         if sv and ABSENT in [str(v) for v in sv.values()]:
             ws.cell(row=r, column=5).fill = FILLS["fail"]
+        if req.startswith("No request observed") and "!! UNVERIFIED" in req:
+            ws.cell(row=r, column=3).fill = FILLS["warn"]
+            unverified.append("%s / %s" % (vendor, ev.get("event", "")))
 
         img_h = place_image(ws, r, "F", shots_dir, ev.get("location_image"))
         ws.row_dimensions[r].height = row_height(
@@ -305,7 +328,7 @@ def vendor_sheet(wb, vendor, events, shots_dir, used_names):
     return r - 2
 
 
-def consent_sheet(ws, consent, shots_dir):
+def consent_sheet(ws, consent, shots_dir, unverified_consent):
     """First tab. Descriptive only. There is deliberately NO pass/fail column."""
     ws.title = "Consent"
     header(ws, CONSENT_HEADERS, CONSENT_COLS)
@@ -337,7 +360,17 @@ def consent_sheet(ws, consent, shots_dir):
         r += 1
 
     for c in rows:
-        vals = [c.get("vendor", ""), c.get("before", ""), c.get("signal", ""),
+        before = str(c.get("before", ""))
+        # "no hits before consent" is the exact claim a run got wrong, so it has
+        # to carry evidence too (ADR-0006 gate, not more prose).
+        if (any(w in before.lower() for w in ("no hit", "none", "no request", "nothing"))
+                and not str(c.get("evidence", "")).strip()):
+            before += ("\n\n!! UNVERIFIED: re-check with window.__nqaRequests() and "
+                       "record how many requests were searched.")
+            unverified_consent.append(str(c.get("vendor", "")))
+        elif str(c.get("evidence", "")).strip():
+            before += "\n\n" + str(c["evidence"])
+        vals = [c.get("vendor", ""), before, c.get("signal", ""),
                 c.get("after", ""), c.get("observation", "")]
         for i, v in enumerate(vals, 1):
             cell = ws.cell(row=r, column=i, value=nodash(v))
@@ -349,6 +382,8 @@ def consent_sheet(ws, consent, shots_dir):
         vf = VENDOR_FILLS.get(str(c.get("vendor", "")).strip().lower())
         if vf:
             ws.cell(row=r, column=1).fill = PatternFill("solid", fgColor=vf)
+        if "!! UNVERIFIED" in before:
+            ws.cell(row=r, column=2).fill = FILLS["warn"]
 
         img_h = place_image(ws, r, "F", shots_dir, c.get("location_image"))
         widths = [CONSENT_COLS[k] for k in ("A", "B", "C", "D", "E")]
@@ -382,9 +417,11 @@ def main():
 
     wb = openpyxl.Workbook()
     used = set()
-    n_consent = consent_sheet(wb.active, consent, shots_dir)     # tab 1, always
+    unverified_consent = []
+    n_consent = consent_sheet(wb.active, consent, shots_dir, unverified_consent)  # tab 1
     used.add("consent")
-    counts = [(v, vendor_sheet(wb, v, by_vendor[v], shots_dir, used)) for v in order]
+    unverified = []
+    counts = [(v, vendor_sheet(wb, v, by_vendor[v], shots_dir, used, unverified)) for v in order]
     wb.save(out_path)
 
     if len(os.path.abspath(out_path)) >= 259:
@@ -394,6 +431,15 @@ def main():
     print("  Consent rows %d" % n_consent)
     for v, n in counts:
         print("  %-16s %d hits" % (v, n))
+    if unverified or unverified_consent:
+        print("")
+        print("  !! %d absence claim(s) carry NO evidence and are marked UNVERIFIED "
+              "in the workbook:" % (len(unverified) + len(unverified_consent)))
+        for u in unverified:
+            print("       hit row     %s" % u)
+        for u in unverified_consent:
+            print("       consent row %s" % u)
+        print("     Re-check each with window.__nqaRequests() before handing this over.")
 
 
 if __name__ == "__main__":
