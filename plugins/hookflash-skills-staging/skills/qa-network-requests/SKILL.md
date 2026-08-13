@@ -1,11 +1,11 @@
 ---
 name: qa-network-requests
-description: QA the analytics network requests a site actually sends (GA4 hits, Meta/Facebook pixel, TikTok, Google Ads, Microsoft UET, or whatever vendor the spec names) by driving a connected Chrome browser, walking the funnel, capturing every outgoing tag request with its decoded payload, reporting how the tags responded to cookie consent, and building an .xlsx (one row per hit) with the verbatim request, the decoded payload, a screenshot of the trigger, and a bulleted audit against the spec. Use when the user runs /qa-network-requests, asks to QA / test / verify that tags, pixels or hits are actually FIRING or being SENT, asks to check network requests, beacons, collect hits or a Facebook/TikTok/GA4 pixel against a tracking spec, or asks how the tags behave before and after cookie consent. For QAing the dataLayer pushes themselves, before the tags that forward them exist, use qa-datalayer instead.
+description: QA the analytics network requests a site actually sends (GA4 hits, Meta/Facebook pixel, TikTok, Google Ads, Microsoft UET, or whatever vendor the spec names) by driving a connected Chrome browser, walking the funnel, capturing every outgoing tag request with its decoded payload, forcing a cookie-consent check to report how the tags behave before and after consent, and building an .xlsx with a Consent tab plus one tab per platform (one row per hit: verbatim request, full payload, just the spec's own parameters, a screenshot of the trigger, and a bulleted audit against the spec). Use when the user runs /qa-network-requests, asks to QA / test / verify that tags, pixels or hits are actually FIRING or being SENT, asks to check network requests, beacons, collect hits or a Facebook/TikTok/GA4 pixel against a tracking spec, or asks how the tags behave before and after cookie consent. For QAing the dataLayer pushes themselves, before the tags that forward them exist, use qa-datalayer instead.
 ---
 
 # QA network requests
 
-Drive the user's connected Chrome, walk the funnel, and for every analytics request the site sends, capture the request and its decoded payload, then audit both against the user's spec. Hand back an `.xlsx`: one row per hit (verbatim request, decoded payload, a tight screenshot of the trigger, a bulleted verdict) plus a Consent sheet describing how each vendor behaved around the cookie banner. Requires the Claude-in-Chrome browser tools.
+Drive the user's connected Chrome, walk the funnel, and for every analytics request the site sends, capture the request and its payload, then audit both against the user's spec. Hand back an `.xlsx` with a **Consent tab first**, then **one tab per platform**: one row per hit, carrying the verbatim request, the full payload, just the spec's own parameters, a tight screenshot of the trigger, and a bulleted verdict. Requires the Claude-in-Chrome browser tools.
 
 **Vendor-agnostic. The spec decides what is checked, not GA4.** GA4 is the most common case but it is not the point. If the spec covers Meta, TikTok, Google Ads, Floodlight, Microsoft UET, Pinterest, LinkedIn, Snapchat, Segment, an affiliate network, or a first-party server-side endpoint, QA those with equal weight. Run the discovery pass (below) to learn what this site actually sends before deciding what to look for, and audit each vendor against what the spec says about that vendor.
 
@@ -42,37 +42,82 @@ If they genuinely have no spec, say plainly that this becomes a description of w
 ## Workflow
 
 1. Read the spec and restate the vendors and events you are checking (input 2 above).
-2. Open a **fresh tab** and navigate to the test URL. A fresh tab matters here: it is what gives you a chance of seeing the pre-consent state.
-3. **Do the consent check now, before anything else and before you touch the banner.** See "Consent check". Getting to it late is unrecoverable without clearing storage and starting again.
+2. Open a **fresh tab** and navigate to the test URL.
+3. **Do the consent check now, before anything else.** It clears cookies, so running it later would empty the cart and log you out mid-walk. See "Consent check".
 4. **Lock the viewport.** Call `resize_window` to **1280 x 900** before capturing anything. Screenshot pixels stay ~1:1 with CSS pixels, so `getBoundingClientRect()` values work directly as crop regions, and coordinates stay reproducible. Do not resize again mid-run.
 5. **Hide dev overlays** so they never leak into a screenshot (tag assistant panels, Shopify's `web-pixels-helper-sandbox-container`, CMP debug badges). Re-hide after each navigation.
 6. **Discovery pass: learn what this site actually sends.** Install `scripts/net_hook.js` and run `window.__nqaAll()` after a page load and one interaction. It returns every outgoing request the vendor matcher recognises **plus** an `unclassified` list of other third-party requests. Read the unclassified list: that is where a vendor the matcher does not know, or a first-party server-side endpoint, shows up. Add anything real to the audit. See REFERENCE "Vendor endpoints and payload shapes".
 7. Walk the funnel, **marking before each trigger and reading after** (see "Attributing a hit to an interaction"): PLP load -> click a product -> PDP (and change variant to re-fire) -> add to cart from the PDP **and** from the mini-bag/drawer, including any upsell/bundle add -> open cart/mini-bag -> remove via **every** control (quantity-decrement, trash/remove, add-on remove) on both cart page and mini-bag -> checkout -> shipping -> payment (**stop before paying**). Adjust to the spec's event list and to a non-ecommerce funnel (forms, sign-ups, calls) where that is what the spec describes.
-8. For each hit record: `event`, `vendor`, the request (method + endpoint), the verbatim URL, the decoded payload, a **tight location screenshot**, and a bulleted verdict audited against the spec.
+8. For each hit record: `event`, `vendor` (this decides which tab it lands on), the request (method + endpoint), the verbatim URL, the full decoded payload, **`spec_params`** (see "The two payload columns"), a **tight location screenshot**, and a bulleted verdict audited against the spec.
 9. **A spec'd event that sends nothing is a finding, and one of the most valuable ones.** Record it with `vendor` from the spec, `sent: false`, and verdict `fail`. Before you do, confirm the interaction really happened and re-check with a fresh mark, and check whether the vendor's library even loaded (see REFERENCE "Nothing fired").
 10. Build the report: write `events.json` and `consent.json` (schemas in REFERENCE) and run `python scripts/build_report.py events.json consent.json <screenshots_dir> <out.xlsx>`.
-11. **Verify**: reopen the workbook, confirm both sheets exist, every row has a request + payload + a readable screenshot, and nothing clips. Say in chat which vendors and events you covered and which you could not.
+11. **Verify**: reopen the workbook and confirm the tab list is Consent followed by one tab per platform, that every row has a request, a full payload, a spec-parameter cell and a readable screenshot, and that nothing clips. Say in chat which vendors and events you covered and which you could not.
+
+### Workbook layout
+
+**One tab per platform, with Consent first.** `build_report.py` builds this from the `vendor` field, so the only thing you control is spelling `vendor` consistently (use `"GA4"`, not `"ga4"` on one row and `"Google Analytics"` on the next, or you get two tabs for one platform).
+
+| Tab | What is on it |
+|---|---|
+| **Consent** (always first) | One row per vendor: before consent, the consent signal, after consent, and a plain descriptive observation. No pass/fail column. |
+| **GA4**, **Meta**, **TikTok**, ... | One row per hit for that platform, in funnel order. Tabs appear in the order the vendors first show up in `events.json`, so lead with the platform the spec cares most about. |
+
+Vendors with no hits at all still deserve a Consent row and, if the spec expected events from them, a tab whose rows are `sent: false`.
+
+### The two payload columns
+
+Every hit gets both, and they answer different questions:
+
+- **Full payload** - every decoded param the hit carried, verbatim. The evidence, and where someone debugging goes.
+- **Spec parameters** - *only* what the spec actually asked about. If the spec describes a nav click with an event name and two params, this cell holds exactly those three things, and none of the `cid`, `gcs`, `sr`, `ul`, `_p` transport noise.
+
+You supply `spec_params` as a list of the param names **as this vendor sends them** (you have just decoded the hit, so you know them):
+
+```json
+"spec_params": ["en", "ep.link_text", "ep.link_url"]
+```
+
+`build_report.py` pulls the values out of the Full payload for you, so the two columns can never disagree and you cannot retype a value wrongly. Anything the spec wants that the hit does not carry renders as `(absent)` and the cell is tinted red: that is the most useful cell in the whole report, so get the list right. Supported forms:
+
+| Form | Use |
+|---|---|
+| `"en"`, `"epn.value"`, `"cd[value]"` | a literal param key (dots and brackets are fine) |
+| `"items[].item_id"` | an item-level param, one value per item |
+| `"__body_json.properties.value"` | a dotted path into a JSON body (TikTok, Segment) |
+
+Use `spec_payload` (an explicit dict) instead only when the spec-to-vendor mapping is not a lookup, e.g. the spec asks for one value that the vendor splits across two params. Prefer `spec_params` everywhere else.
+
+If the spec says nothing about a hit you captured, leave `spec_params` off; the cell will say so, and the hit is still on record.
 
 ### Output filename (hard rule)
 
-The output `.xlsx` name must be **short and generic: at most ~12 characters before `.xlsx`, with no client/theme/description in it** (e.g. `CB_NQA.xlsx`, `net_qa.xlsx`). Never a long descriptive name like `CurrentBody_IE_network_request_QA.xlsx`. Put the descriptive title (client, date, spec version) inside the workbook, on the sheet or a header row, not in the filename. After saving, assert `len(full_windows_path) < 259` and shorten further if not.
+The output `.xlsx` name must be **short and generic: at most ~12 characters before `.xlsx`, with no client/theme/description in it** (e.g. `CB_NQA.xlsx`, `net_qa.xlsx`). Never a long descriptive name like `CurrentBody_IE_network_request_QA.xlsx`. Put the descriptive title (client, date, spec version) inside the workbook, not in the filename. After saving, assert `len(full_windows_path) < 259` and shorten further if not.
 
-## Consent check (do this first, and only describe what you see)
+## Consent check (forced, first, and only describe what you see)
 
 The point is to **report how the tags reacted to consent**, not to grade the implementation. There is no correct answer here, and several perfectly legitimate setups look different from each other.
 
-**Step 1: what state did you land in?** On the fresh tab, before clicking anything:
+**Always force the pre-consent state rather than hoping for it.** If the browser has already accepted cookies for this site, you would otherwise never see the interesting half. So clear the site's cookies and storage and reload, which brings the banner back.
+
+**Step 1: warn the user, then reset.** `scripts/reset_consent.js` is destructive to the site session, so say what it will do before running it, and get a yes if any of it would cost them something:
+
+- It **logs you out of the site.** On a password-protected staging or preview build, you will have to sign in again after the reload.
+- It **empties the cart**, which is why the consent check runs before you walk the funnel and never in the middle of it.
+- Shopify (and others) consume **theme/preview params into a session cookie** and strip them from the URL, so clearing cookies can drop you out of the previewed theme. Keep the original preview link, re-apply it after the reload, and confirm the right theme/pixel is live (e.g. `window.Shopify.theme.id`) before continuing.
+
+Then run the script and **reload the page**.
+
+**Step 2: check the reset actually worked.** The script returns the cookie names that survived; anything left is almost certainly `HttpOnly`, which JS cannot touch. Confirm the banner is back:
 
 ```js
 !!document.querySelector('[id*=onetrust], [class*=ot-sdk], #CybotCookiebotDialog, [id*=usercentrics], [class*=cky-], [id*=cookie], [class*=consent], [class*=gdpr]')
 ```
 
-Also check for a CMP API (`window.OnetrustActiveGroups`, `window.Cookiebot?.consent`, `window.__tcfapi`) and whether Google's consent state is already granted (`window.google_tag_data?.ics?.getConsentState?.()`).
+Also check the CMP API (`window.OnetrustActiveGroups`, `window.Cookiebot?.consent`, `window.__tcfapi`) and Google's consent state (`window.google_tag_data?.ics?.getConsentState?.()`).
 
-- **Consent was already granted** (no banner, a persisted CMP cookie, or the CMP reports granted): **just carry on.** Do the payload QA normally. Put one line on the Consent sheet saying consent was already accepted when the session started, so pre-consent behaviour was not observed, and offer to re-run in a clean profile if they want it.
-- **Consent has not been given** (a banner is up): run steps 2 to 4.
+If **no banner returns**, do not pretend the check ran. Consent may be held server-side or against the account, an `HttpOnly` cookie may have survived, or the site may show no banner in this region at all. Set `state` to `already_accepted`, say which of those you could rule out, and carry on with the payload QA.
 
-**Step 2: capture the pre-consent state.** Do not click the banner yet. Read what already fired at page load:
+**Step 3: capture the pre-consent state.** Do not touch the banner yet. Install the hook and read what already fired at page load:
 
 ```js
 window.__nqaAll()          // includes page-load hits via the performance buffer
@@ -80,9 +125,9 @@ window.__nqaAll()          // includes page-load hits via the performance buffer
 
 For each vendor in the spec, record: did **any** hit go out, and if so what consent signal did it carry.
 
-**Step 3: grant consent** (click Accept all, or whatever the spec's scenario is), then read again with a fresh mark. Note which vendors started sending, and whether the consent signal changed.
+**Step 4: grant consent** (click Accept all, or whatever the spec's scenario is), then read again with a fresh mark. Note which vendors started sending, and whether the consent signal changed. Screenshot the banner for the Consent tab while it is still on screen.
 
-**Step 4: write it up descriptively**, one row per vendor on the Consent sheet. Report, do not prescribe:
+**Step 5: write it up descriptively**, one row per vendor on the Consent tab. Report, do not prescribe:
 
 - **No hits at all before consent, hits after** - basic consent mode, or the tag is simply gated on consent. Describe it as observed.
 - **GA4 hits before consent carrying `gcs=G100`** - advanced consent mode: the hit is a cookieless ping with `ad_storage` and `analytics_storage` both denied. This is a normal, deliberate configuration. Report it as advanced consent mode, **not** as a failure.
@@ -92,7 +137,9 @@ For each vendor in the spec, record: did **any** hit go out, and if so what cons
 
 `gcs` decodes as `G` + a status digit + `ad_storage` + `analytics_storage`, each `1` granted / `0` denied, `-` unset. So `G100` = both denied, `G101` = analytics granted only, `G110` = ads granted only, `G111` = both granted. The `gcd` param carries the fuller default/update signal and is useful corroboration; do not attempt to fully decode it, quote it verbatim.
 
-Keep the whole Consent sheet descriptive. **No pass/fail column on it.** If the user asks you to judge it, then judge it, but do not volunteer a verdict.
+Keep the whole Consent tab descriptive. **No pass/fail column on it**, by design, and `build_report.py` does not provide one. If the user asks you to judge it, then judge it in chat, but do not volunteer a verdict.
+
+Once consent is granted, the funnel walk proceeds normally in the consented state, which is what the rest of the QA is about.
 
 ## Reading hits reliably (two layers, use both)
 
@@ -188,8 +235,8 @@ One tight, readable screenshot per hit, using the same rules as `/qa-datalayer`.
 
 **Page-load hits**: one screenshot of the page trimmed to the content column, preferring the relevant section over a tall full-page dump.
 
-**Consent rows**: screenshot the cookie banner itself for the pre-consent row, so the reader can see exactly which state was being described.
+**Consent rows**: screenshot the cookie banner itself while it is on screen, so the reader can see exactly which state was being described.
 
 Because screenshots at the locked 1280 viewport are ~1:1 with CSS pixels, `getBoundingClientRect()` values work directly as `zoom` regions with no scaling factor. Save every crop into the screenshots directory you pass to `build_report.py`, which scales each image to fit inside the screenshot column so nothing overhangs.
 
-See [REFERENCE.md](REFERENCE.md) for vendor endpoints and payload shapes, the GA4 param and item-prefix tables, the events.json / consent.json schemas, the discovery snippets, and what to do when nothing fired.
+See [REFERENCE.md](REFERENCE.md) for vendor endpoints and payload shapes, the GA4 param and item-prefix tables, the events.json / consent.json schemas, worked `spec_params` examples per vendor, the discovery snippets, and what to do when nothing fired.
