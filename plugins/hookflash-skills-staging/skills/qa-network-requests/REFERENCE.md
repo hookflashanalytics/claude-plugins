@@ -136,6 +136,13 @@ window.__nqaSince();     // decoded hits since the mark, escaped for the output 
 })
 ```
 
+**Force the pre-consent state** (run `scripts/reset_consent.js`, then reload). It clears cookies,
+localStorage, sessionStorage and best-effort IndexedDB for the origin, and returns the cookie
+names that survived. Survivors are almost certainly `HttpOnly` and cannot be cleared from JS; if
+a consent cookie is among them, say the reset was partial rather than claiming a clean slate.
+**It logs the user out and empties the cart**, and can drop a Shopify preview out of its theme,
+so warn first and always run it before the funnel walk.
+
 **Consent surface:**
 
 ```js
@@ -167,14 +174,19 @@ A list, one object per hit, in funnel order. See the header of `scripts/build_re
 authoritative list.
 
 - `event`: the event name as the **spec** calls it (e.g. `add_to_cart`).
-- `vendor`: `"GA4"` | `"Meta"` | `"TikTok"` | ... Drives the Vendor column colour.
+- `vendor`: `"GA4"` | `"Meta"` | `"TikTok"` | ... **Decides which tab the hit lands on**, so spell
+  it identically on every row for a platform or you get two tabs for one vendor.
 - `sent`: `true` | `false`. `false` renders the request cell as "No request observed".
 - `method`: `"GET"` | `"POST"`.
 - `endpoint`: host + path only, e.g. `metrics.example.com/g/collect`. Keeps the column readable.
 - `url`: the **verbatim** full URL. Never trimmed or rewritten.
 - `body`: the verbatim request body, or null.
-- `payload`: a dict of decoded params (`{"en": "add_to_cart", "epn.value": 29.99, "pr1": {...}}`).
-  Dumped with `indent=2`. Vendor param names, not renamed.
+- `payload`: a dict of every decoded param (`{"en": "add_to_cart", "epn.value": 29.99, ...}`).
+  Renders as **Full payload**, dumped with `indent=2`. Vendor param names, not renamed.
+- `spec_params`: list of the param names **the spec cares about**, as this vendor sends them.
+  Renders as **Spec parameters**, with values pulled out of `payload` by the script (see below).
+- `spec_payload`: optional explicit dict, overrides `spec_params`. Only for mappings that are not
+  a lookup.
 - `conditions`: what you did to trigger it.
 - `location_image`: filename inside the screenshots dir. Prefer a tight crop saved via the
   `computer` `zoom` action.
@@ -182,27 +194,58 @@ authoritative list.
 - `count`: optional integer, how many identical hits fired for the one interaction. Rendered
   when > 1, so duplicate tagging is visible.
 
+### Worked `spec_params`, per vendor
+
+The point of this column is to answer "did the spec get what it asked for" without the reader
+wading through `cid`, `gcs`, `sr`, `ul` and `_p`. Values are resolved out of `payload`, so they
+cannot disagree with the Full payload beside them, and anything missing renders `(absent)` in a
+red cell.
+
+| Spec asks for | GA4 | Meta | TikTok |
+|---|---|---|---|
+| event name | `en` | `ev` | `__body_json.event` |
+| value | `epn.value` | `cd[value]` | `__body_json.properties.value` |
+| currency | `cu` | `cd[currency]` | `__body_json.properties.currency` |
+| a custom param | `ep.link_text` | `cd[link_text]` | `__body_json.properties.link_text` |
+| destination ID | `tid` | `id` | `__body_json.context.pixel.code` |
+| item id / name | `items[].item_id`, `items[].item_name` | `cd[content_ids]` | `__body_json.properties.contents` |
+
+So a nav-click spec with an event name and two params is simply:
+
+```json
+"spec_params": ["en", "ep.link_text", "ep.link_url"]
+```
+
+Include `tid` / pixel ID whenever the spec names a property or pixel: a perfectly-formed hit sent
+to the wrong destination is a silent, expensive failure that every other column would pass.
+
 ## consent.json schema
 
-A list, one object per vendor, plus optionally one `state` object first.
+A list, one object per vendor, plus optionally one state object first.
 
-- `state`: `"not_accepted"` | `"already_accepted"`. When `already_accepted`, one row is enough:
-  say pre-consent behaviour was not observed and offer a clean-profile re-run.
+- `state`: `"forced"` (the normal case: you cleared cookies and reloaded) | `"already_accepted"`
+  (the reset did not bring the banner back) | `"not_accepted"` (a banner was up anyway).
+- `reset`: optional sentence describing what the reset actually cleared, e.g.
+  `"Cleared 14 cookies and 22 localStorage keys, then reloaded."` Appended to the banner line.
 - `vendor`: vendor name.
 - `before`: what was observed before consent, e.g. `"1 hit (page_view)"` or `"No hits observed"`.
 - `signal`: the consent signal on those hits, e.g. `"gcs=G100 (ad_storage denied, analytics_storage denied)"`, or `"n/a (no consent parameter)"`.
 - `after`: what was observed after granting consent.
 - `observation`: one or two plain descriptive sentences. **Describe, do not grade.** No verdict
-  field exists on this sheet by design.
+  field exists on this tab by design.
 - `location_image`: optional, normally the cookie banner screenshot.
 
-## Report columns
+## Workbook layout
 
-**Sheet 1, "Network QA":** Event name | Vendor | Conditions tested | Request (method, endpoint,
-verbatim URL, body) | Decoded payload | Location screenshot | Pass / Fail.
+**Tab 1, "Consent"** (always first): Vendor | Before consent | Consent signal | After consent |
+Observation | Screenshot. No pass/fail column, by design.
 
-**Sheet 2, "Consent":** Vendor | Before consent | Consent signal | After consent | Observation |
-Screenshot. No pass/fail column, by design.
+**Tab 2..N, one per platform** (`GA4`, `Meta`, `TikTok`, ... in the order they first appear in
+`events.json`): Event name | Conditions tested | Request (method, endpoint, verbatim URL, body) |
+Full payload | Spec parameters | Location screenshot | Pass / Fail.
+
+There is no Vendor column on the platform tabs; the tab name is the vendor. Tab names are
+sanitised for Excel (31 chars, no `: \ / ? * [ ]`, deduplicated) and tinted per vendor.
 
 Rows auto-size to fit. Keep the output filename short (~12 chars max, generic): deep session
 paths hit the Windows 259-char limit and the workbook will not open.
