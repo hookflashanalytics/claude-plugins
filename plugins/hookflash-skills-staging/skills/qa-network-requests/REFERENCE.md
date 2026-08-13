@@ -83,9 +83,19 @@ mis-decoded prefix produces a confident, wrong finding.
 
 ## Nothing fired: work through this before recording a miss
 
+**Nothing here is optional, and none of it is satisfied by prose.** The claim ships with an
+`absence_evidence` string of the form "N requests searched, none matching X", or
+`build_report.py` stamps the row `!! UNVERIFIED`. See SKILL.md "Claiming something did not fire".
+
+0. **Search unfiltered, and count what you searched.** `window.__nqaRequests()` returns every
+   request with a total; `window.__nqaRequests('collect')` narrows it so you can see what you
+   narrowed. Match on **path**, never host: server-side tagging puts the endpoint on the
+   client's own domain (`data.<client>.com/g/collect`), so searching `google-analytics.com`
+   returns nothing on a site sending thousands of hits.
 1. **Did the interaction actually happen?** Re-read the page. An AJAX add-to-cart that silently
    failed sends nothing because nothing happened, which is a site bug, not a tracking bug.
-2. **Wait longer and re-read.** Beacons are async. Wait 1 to 2 seconds, read again.
+2. **Wait longer and re-read.** Beacons are async and vendors do not fire together (Google's
+   `/ccm/collect` consent ping lands before GA4's `/g/collect`). Wait 1 to 2 seconds, read again.
 3. **Was the mark set before the click?** A mark set after the beacon filters it out.
 4. **Did the hook survive the navigation?** Re-install `net_hook.js` after every page load.
 5. **Is it a POST-body vendor** (TikTok, Segment) with the hook missing? The performance buffer
@@ -93,14 +103,22 @@ mis-decoded prefix produces a confident, wrong finding.
 6. **Did the vendor's library load at all?** Check for `gtag/js`, `fbevents.js`, `events.js` in
    the performance buffer, and for the globals: `window.dataLayer`, `window.fbq`, `window.ttq`,
    `window.uetq`, `window.google_tag_manager`. Library present but nothing sent = installed and
-   gated. Library absent = not installed on this page.
+   gated. Library absent = not installed on this page. **This is the only legitimate use of
+   `window.dataLayer` in this skill**: it tells you the stack is installed. It is never evidence
+   about whether a hit was sent, and its contents must never be filtered to decide that (sites
+   customise the push shape, so a guessed field name yields a false negative).
 7. **Is it gated on consent?** If the consent check ran with consent denied, a vendor sending
    nothing is the expected behaviour of a consent-gated tag, not a missing tag. Grant consent
    and retry before recording a miss.
 8. **Is it fired only on a different page or template?** Check the spec for where it should fire.
 
-Only after all of these: record `sent: false`, verdict `fail`, and say in the notes which of the
-above you ruled out. Never guess a payload for a hit you did not see.
+Only after all of these: record `sent: false`, verdict `fail`, an `absence_evidence` string
+carrying the number of requests you searched, and notes saying which of the above you ruled out.
+Never guess a payload for a hit you did not see.
+
+**And if you later learn you were wrong about a shape, an endpoint or a vendor, come back and
+re-audit every absence you recorded before you knew it.** A null recorded early in the run is the
+one most likely to be wrong, because that is when you knew least.
 
 ## Discovery snippets
 

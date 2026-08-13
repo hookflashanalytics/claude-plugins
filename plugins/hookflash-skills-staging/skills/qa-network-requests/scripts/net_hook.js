@@ -11,11 +11,13 @@
  *      BODIES, which is the only way to read TikTok, Segment or a batched GA4 hit.
  *
  * API:
- *   window.__nqaMark()   -> set a baseline immediately BEFORE an interaction
- *   window.__nqaSince()  -> decoded hits that started after the mark (escaped)
- *   window.__nqaAll()    -> every hit this page has made + unclassified + libraries
- *   window.__dump(obj)   -> JSON escaped so the tool's output filter cannot blank it
- *   window.__nqaRaw      -> the raw hook-captured array, if you need it
+ *   window.__nqaMark()      -> set a baseline immediately BEFORE an interaction
+ *   window.__nqaSince()     -> decoded hits that started after the mark (escaped)
+ *   window.__nqaAll()       -> every hit this page has made + unclassified + libraries
+ *   window.__nqaRequests(f) -> EVERY request, unfiltered, optionally substring/regex
+ *                              filtered. Required evidence before claiming absence.
+ *   window.__dump(obj)      -> JSON escaped so the tool's output filter cannot blank it
+ *   window.__nqaRaw         -> the raw hook-captured array, if you need it
  */
 (function () {
   if (window.__nqa_installed) { return "net_hook already installed"; }
@@ -298,15 +300,19 @@
     var events = [];
     hits.forEach(function (h) { events = events.concat(decode(h)); });
 
-    /* everything else, so an unknown vendor cannot hide */
+    /* everything else, so an unknown vendor cannot hide.
+       NOTE: same-host beacons are included too. Under server-side tagging the
+       collect endpoint is first-party, so filtering to cross-origin only would
+       hide exactly the hits this skill most needs to find. */
     var unclassified = [], libraries = [];
     try {
       performance.getEntriesByType("resource").forEach(function (e) {
         var host = ""; try { host = new URL(e.name).host; } catch (x) {}
         if (LIBS.test(e.name)) { libraries.push(host + (new URL(e.name).pathname)); return; }
         if (vendorOf(e.name)) { return; }
-        if (host && host !== location.host && MAYBE.test(e.name)) {
-          unclassified.push({ url: e.name.slice(0, 300), initiator: e.initiatorType });
+        if (MAYBE.test(e.name)) {
+          unclassified.push({ url: e.name.slice(0, 300), initiator: e.initiatorType,
+                              firstParty: host === location.host });
         }
       });
     } catch (e) {}
@@ -315,6 +321,56 @@
       recognised: events.length, events: events,
       unclassified: unclassified, libraries: libraries.filter(function (v, i, a) { return a.indexOf(v) === i; }),
       carry: (function () { try { return sessionStorage.__nqa_carry ? JSON.parse(sessionStorage.__nqa_carry).length : 0; } catch (e) { return 0; } })()
+    });
+  };
+
+  /* EVERY request this page has made, unfiltered, with an optional substring or
+     regex filter. This is the evidence source for an ABSENCE claim: you cannot
+     write "no GA4 hits" off a filtered view that might be filtering wrongly, so
+     dump the whole set, search it yourself, and report the count you searched.
+       window.__nqaRequests()             -> all of them
+       window.__nqaRequests('collect')    -> just those containing "collect"
+     Returns {total, shown, urls}: `total` is the number you actually searched,
+     which is the number that belongs in the report. */
+  window.__nqaRequests = function (filter) {
+    var all = [];
+    try {
+      all = performance.getEntriesByType("resource").map(function (e) {
+        return { url: e.name, initiator: e.initiatorType };
+      });
+    } catch (e) {}
+    /* the hook sees things the buffer can miss (and vice versa), so union them */
+    raw.forEach(function (h) {
+      if (!all.some(function (a) { return a.url === h.url; })) {
+        all.push({ url: h.url, initiator: h.via });
+      }
+    });
+    var shown = all;
+    if (filter) {
+      var re = (filter instanceof RegExp) ? filter : new RegExp(String(filter), "i");
+      shown = all.filter(function (a) { return re.test(a.url); });
+    }
+    /* Say it in words as well as numbers. A filter that matched something is not
+       an absence, and "shown: 1" is too easy to skim past while writing "none
+       matching" underneath it. */
+    var hint;
+    if (!filter) {
+      hint = all.length + " requests seen on this page";
+    } else if (shown.length) {
+      hint = "MATCHES FOUND (" + shown.length + " of " + all.length +
+             ") - this is NOT an absence, read the urls below";
+    } else {
+      hint = "0 of " + all.length + " requests matched - safe to record as absent, " +
+             "evidence: \"" + all.length + " requests searched, none matching " +
+             String(filter) + "\"";
+    }
+
+    return window.__dump({
+      total: all.length,
+      shown: shown.length,
+      filter: filter ? String(filter) : null,
+      verdict: hint,
+      urls: shown.map(function (a) { return a.initiator + " " + a.url.slice(0, 300); })
     });
   };
 

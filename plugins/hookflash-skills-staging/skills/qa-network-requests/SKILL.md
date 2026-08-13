@@ -32,6 +32,8 @@ If they genuinely have no spec, say plainly that this becomes a description of w
 
 - **Never complete a purchase.** Stop at the payment step. Pause and ask before anything irreversible, account, or payment related. Never enter real personal or payment data into checkout forms.
 - **The request and payload columns come from the browser, never rewritten.** Dump the captured URL and body verbatim. Decode the payload into readable key/value pairs, but never invent, tidy or complete a value. If a param is absent, it is absent.
+- **An empty read is not a finding.** A filter that returns nothing means *your filter found nothing*, which is not the same as *nothing was sent*. Every "did not fire" claim needs positive evidence before it goes in the report. See "Claiming something did not fire".
+- **The network request is the only evidence that a hit was sent. The dataLayer is not.** Do not read `dataLayer` (or `gtag`, or a theme module) to decide whether an event reached a vendor: sites customise the push shape (`{event: "ecommerce", event_name: "view_item_list"}` is common), so filtering it on a guessed field name produces false negatives while the hit is sitting in the network log. `dataLayer` is a diagnostic for *is the tagging stack installed*, nothing more.
 - **Escape every payload you return, or you will get blank results.** The browser tool blanks any result containing `?`, `=` or `&`, and every tag hit is one long query string, so this bites on literally every read. Always return through `window.__dump(...)` (see "The output filter"). This is the single most common way a run stalls.
 - **Never paste hashed or raw user data into the report.** Advanced-matching params (Meta `ud[em]` / `ud[ph]`, GA4 user-provided data, UET `em`) carry hashed emails and phone numbers. Record that the param was **present** and its length, never its value. Same for `cid` / `_ga` client IDs: note presence, truncate to the first few characters.
 - **Consent is reported, never graded.** See "Consent check". Describe what the tags did; do not tell the user it is wrong.
@@ -49,7 +51,7 @@ If they genuinely have no spec, say plainly that this becomes a description of w
 6. **Discovery pass: learn what this site actually sends.** Install `scripts/net_hook.js` and run `window.__nqaAll()` after a page load and one interaction. It returns every outgoing request the vendor matcher recognises **plus** an `unclassified` list of other third-party requests. Read the unclassified list: that is where a vendor the matcher does not know, or a first-party server-side endpoint, shows up. Add anything real to the audit. See REFERENCE "Vendor endpoints and payload shapes".
 7. Walk the funnel, **marking before each trigger and reading after** (see "Attributing a hit to an interaction"): PLP load -> click a product -> PDP (and change variant to re-fire) -> add to cart from the PDP **and** from the mini-bag/drawer, including any upsell/bundle add -> open cart/mini-bag -> remove via **every** control (quantity-decrement, trash/remove, add-on remove) on both cart page and mini-bag -> checkout -> shipping -> payment (**stop before paying**). Adjust to the spec's event list and to a non-ecommerce funnel (forms, sign-ups, calls) where that is what the spec describes.
 8. For each hit record: `event`, `vendor` (this decides which tab it lands on), the request (method + endpoint), the verbatim URL, the full decoded payload, **`spec_params`** (see "The two payload columns"), a **tight location screenshot**, and a bulleted verdict audited against the spec.
-9. **A spec'd event that sends nothing is a finding, and one of the most valuable ones.** Record it with `vendor` from the spec, `sent: false`, and verdict `fail`. Before you do, confirm the interaction really happened and re-check with a fresh mark, and check whether the vendor's library even loaded (see REFERENCE "Nothing fired").
+9. **A spec'd event that sends nothing is a finding, and one of the most valuable ones, which is exactly why it has to be proved.** Record it with `vendor` from the spec, `sent: false`, verdict `fail`, and a mandatory `absence_evidence` string. See "Claiming something did not fire" before writing any of those.
 10. Build the report: write `events.json` and `consent.json` (schemas in REFERENCE) and run `python scripts/build_report.py events.json consent.json <screenshots_dir> <out.xlsx>`.
 11. **Verify**: reopen the workbook and confirm the tab list is Consent followed by one tab per platform, that every row has a request, a full payload, a spec-parameter cell and a readable screenshot, and that nothing clips. Say in chat which vendors and events you covered and which you could not.
 
@@ -117,13 +119,18 @@ Also check the CMP API (`window.OnetrustActiveGroups`, `window.Cookiebot?.consen
 
 If **no banner returns**, do not pretend the check ran. Consent may be held server-side or against the account, an `HttpOnly` cookie may have survived, or the site may show no banner in this region at all. Set `state` to `already_accepted`, say which of those you could rule out, and carry on with the payload QA.
 
-**Step 3: capture the pre-consent state.** Do not touch the banner yet. Install the hook and read what already fired at page load:
+**Step 3: capture the pre-consent state.** Do not touch the banner yet. Install the hook, then **let the page settle and read twice**:
 
 ```js
-window.__nqaAll()          // includes page-load hits via the performance buffer
+window.__nqaAll()          // read 1: page-load hits via the performance buffer
+// wait 2 seconds
+window.__nqaAll()          // read 2: catches what had not been sent yet
+window.__nqaRequests()     // unfiltered, for the count that backs any "no hits" claim
 ```
 
-For each vendor in the spec, record: did **any** hit go out, and if so what consent signal did it carry.
+**Reading once, immediately, is how this step goes wrong.** Vendors do not fire together: Google's consent ping (`/ccm/collect`) goes out noticeably before GA4's own `/g/collect`, so a single early read catches the ping, misses the hit, and produces a confident "no GA4 hits before consent" while the hit is in the log a moment later. This is not hypothetical, it has happened on a real run.
+
+For each vendor in the spec, record: did **any** hit go out, and if so what consent signal did it carry. **A "no hits" row needs an `evidence` string** with the number of requests searched, exactly as in "Claiming something did not fire". Remember the endpoint is often first-party, so search the **path** (`/g/collect`), not `google-analytics.com`.
 
 **Step 4: grant consent** (click Accept all, or whatever the spec's scenario is), then read again with a fresh mark. Note which vendors started sending, and whether the consent signal changed. Screenshot the banner for the Consent tab while it is still on screen.
 
@@ -155,6 +162,36 @@ Once consent is granted, the funnel walk proceeds normally in the consented stat
 It wraps `fetch`, `XMLHttpRequest`, `navigator.sendBeacon` and the `HTMLImageElement.prototype.src` setter, and resolves `Blob` bodies asynchronously. This is the only way to see a POST body, which matters because **TikTok, Segment and GA4 batched hits put the payload in the body, not the URL**. **Re-install after every navigation** (page load wipes it).
 
 `window.__nqaAll()` merges both layers, keyed on URL, so a POST hit arrives with its body attached and a load-time GET arrives from the performance buffer. Use it rather than reading either layer by hand.
+
+## Claiming something did not fire
+
+The two worst findings this skill can produce are both false negatives: "this event never fired" and "nothing was sent before consent". Both have been produced on a real run while the hits were plainly in the network log, because a read came back empty and the empty result was written up as a finding. An empty read is a question, not an answer.
+
+**The rule: to assert an absence, show the set you searched.** Never conclude from a filtered view.
+
+```js
+window.__nqaRequests()            // EVERY request, unfiltered, with a total
+window.__nqaRequests('/g/collect')   // or narrow it, and see what you narrowed
+```
+
+It returns a `verdict` line that does the reasoning for you, so read that before writing anything:
+
+- `"MATCHES FOUND (2 of 4) - this is NOT an absence, read the urls below"` -> **stop.** The hit is there. Go and decode it.
+- `"0 of 68 requests matched - safe to record as absent, evidence: \"68 requests searched, none matching /g/collect\""` -> paste that evidence sentence straight into `absence_evidence` (or `evidence` on a Consent row) and add what else you ruled out:
+
+> `"68 requests searched, none matching /g/collect. gtag/js loaded and window.google_tag_manager exists, so GTM is installed and this tag is not firing."`
+
+The count is what makes the claim falsifiable, and it is self-correcting: if the hit was there, you cannot miss it while counting. `build_report.py` stamps any absence claim with no evidence as **`!! UNVERIFIED`** in the workbook and prints a warning at the end of the run, so an unproved negative cannot quietly ship.
+
+Work through these before recording the miss (full list in REFERENCE "Nothing fired"):
+
+1. **Settle, then read twice.** Beacons are async and vendors do not fire together. Wait 1 to 2 seconds, read, wait, read again.
+2. **Search unfiltered**, per the rule above. Match on **path**, never host: under server-side tagging the endpoint is first-party (`data.<client>.com/g/collect`), so a search for `google-analytics.com` finds nothing on a site sending thousands of hits.
+3. **Did the interaction actually happen?** An AJAX add-to-cart that silently failed sends nothing because nothing happened.
+4. **Did the hook survive the last navigation?** Re-install after every page load.
+5. **Did the vendor's library load?** Library present but nothing sent is "installed and gated", a much sharper finding than "missing".
+
+**If an assumption turns out to be wrong, re-audit every earlier absence.** Discovering mid-run that the site uses a custom event shape, a first-party endpoint, or a vendor you had not matched invalidates every "did not fire" verdict you wrote before you knew it. Go back and re-check them against the corrected understanding. Findings are provisional until the run ends; a null result recorded early is the one most likely to be wrong, because you knew least at the time.
 
 ## Attributing a hit to an interaction
 
