@@ -284,17 +284,38 @@ good the idea is, and a backlog full of unpowered tests is the standard failure 
 
 ### The MDE calculation
 
-Two-sided, 95% confidence, 80% power, comparing two proportions:
+Two-sided, 95% confidence, 80% power, comparing two proportions. **This is deliberately the same
+calculation as Results Analysis's design sample size** (`_ra_required_users_per_arm` in Tapa's
+`results_summary.py`, which is the PEA workbook's hidden "Sample Size" column). The same team reads
+both numbers, so they must not disagree.
 
 ```
-n per arm  = K · p(1-p) / (p · mde_rel)²
-mde_rel    = sqrt( K · p(1-p) / n ) / p
+C       = (z(0.975) + z(0.80))²  =  (1.95996 + 0.84162)²  =  7.8489
+p_v     = p · (1 + mde_rel)                  the variation's rate at the MDE
+avg_var = ( p(1-p) + p_v(1-p_v) ) / 2        each arm's variance, averaged
 
-K = 2 · (z(0.975) + z(0.80))²  =  2 · (1.95996 + 0.84162)²  =  15.6978
+n per arm = 2 · avg_var · C / (p_v - p)²
 ```
 
-Use **15.6978**. `16` is the familiar rounded form and it is ~1% conservative, which is harmless,
-but write the constant you used into the tab's context line either way so the number can be checked.
+Solved for the MDE at a known `n`, that is a quadratic with a closed form — no iteration:
+
+```python
+def mde_relative(p, n_per_arm, C=7.8489):
+    a = p * (n_per_arm + C)
+    b = -C * (1 - 2 * p)
+    c = -2 * C * (1 - p)
+    return (-b + math.sqrt(b * b - 4 * a * c)) / (2 * a)
+```
+
+**Do not simplify `avg_var` to a single shared `p(1-p)`.** It looks equivalent and is not: a
+variation that genuinely improves a low base rate carries more variance than the control, so
+assuming the control's variance for both arms understates the sample needed. Measured on the first
+run, the shared-`p` shortcut reported 19.13% for the homepage where the correct figure is 20.05%,
+and delivered **76.4% power, not the 80% it claimed**. The error is negligible at high base rates
+(the two checkout-step candidates move by 0.3% and 0.0%) and material at the low ones, which are
+exactly the candidates sitting near the threshold.
+
+Write `C` and the confidence and power into the tab's context line so the number can be checked.
 
 Four rules about the inputs. Each of them changes the answer, and three of them are easy to get
 subtly wrong:
