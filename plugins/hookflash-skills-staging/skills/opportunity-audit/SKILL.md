@@ -285,19 +285,24 @@ step-to-step drop-off.
 | Step-to-step drop-off by device, by channel group, and by top landing pages | Whose leak it is |
 | Each funnel step × device category | Where the volume is vs where the conversion is |
 | Each funnel step × channel group | Which traffic gets how deep |
-| Landing page × sessions × conversions × conversion rate | The pages worth testing at all |
+| Landing page × sessions × conversions × conversion rate† | The pages worth testing at all |
 | Landing page grouped by page type | Which *kind* of page carries the business |
 | Landing page × device | A page that converts on desktop and dies on mobile |
 | Landing page × channel group | The combination effects — often the real finding |
-| Channel group × sessions × conversion rate | Which traffic converts |
-| Session source/medium × sessions × conversion rate | The grain below channel group — where the paid and referral stories hide |
-| Campaign × sessions × conversion rate (where paid traffic exists) | Which spend lands on which pages |
-| Device category × sessions × conversion rate | The headline device split |
-| New vs returning × sessions × conversion rate | Whether the funnel serves first-time visitors |
-| Country × sessions × conversion rate | Whether one market drags the average |
+| Channel group × sessions × conversion rate† | Which traffic converts |
+| Session source/medium × sessions × conversion rate† | The grain below channel group — where the paid and referral stories hide |
+| Campaign × sessions × conversion rate† (where paid traffic exists) | Which spend lands on which pages |
+| Device category × sessions × conversion rate† | The headline device split |
+| New vs returning × sessions × conversion rate† | Whether the funnel serves first-time visitors |
+| Country × sessions × conversion rate† | Whether one market drags the average |
 | Daily sessions and conversions across the range | Seasonality, launch spikes, tracking gaps |
 | **Daily event counts, top 20 events** | Which behaviours move together, and which day a tracking change landed |
 | **Item name × items viewed / added to cart / purchased** (ecommerce) | Which products lose people, and where |
+
+**† Every "conversion rate" in that table is a workbook calculation, never a metric you ask GA4
+for.** Pull the two counts — `sessions` (and `totalUsers`) with `keyEvents` — and divide in the
+workbook. Asking for `sessionKeyEventRate` or `userKeyEventRate` directly costs you the de-sampling
+below, so the tab comes back an estimate for no gain.
 
 **Wherever a slice is broken down by channel, use the grouping the user chose in Step 1.** If they
 asked for both, that slice gets **two tabs** — one per grouping, each named for the grouping it
@@ -336,13 +341,13 @@ explanation, and do not quietly drop the tab.
 
 ### Ask GA4 for exact numbers, not estimates
 
-**Set `desample` on every slice you pull.** These numbers go into a workbook the client's
-experimentation team will read as fact, and GA4 hands back a sampled estimate in exactly the same
-shape as an exact answer. With `desample` set, a sampled query is re-run across acquisition-cohort
-buckets and summed, which is exact; an unsampled query costs nothing extra, so there is no reason to
-leave it off.
+**Set `desample` on every `answer_client_data_question` slice you pull.** These numbers go into a
+workbook the client's experimentation team will read as fact, and GA4 hands back a sampled estimate
+in exactly the same shape as an exact answer. With `desample` set, a sampled query is re-run across
+acquisition-cohort buckets and summed, which is exact; an unsampled query costs nothing extra, so
+there is no reason to leave it off.
 
-It has two limits worth knowing before you design a query:
+It has three limits worth knowing before you design a query:
 
 - **It only works on additive count metrics.** Ask for `sessions`, `totalUsers`, `keyEvents`,
   `eventCount`, `itemsViewed` and compute the rates yourself in the workbook. A query that asks GA4
@@ -351,6 +356,12 @@ It has two limits worth knowing before you design a query:
   fractions computed from two counts.
 - **`metric_filters` block it**, because GA4 applies them inside each bucket, so a row that only
   clears the threshold in total would disappear. Pull the rows and filter them yourself.
+- **`run_ga4_funnel_report` has no `desample` parameter at all**, and neither does a pivot. Do not
+  go looking for one and never say you set one. A funnel or pivot answer still reports its own
+  completeness, so a sampled one can be *recorded* but not *fixed*: for a pivot, re-pull it flat and
+  de-sample that (see the daily-events tab above); for a funnel, shorten the range or narrow the
+  breakdown and pull it again, and if it is still sampled, say so on the tab and treat every
+  step-to-step rate on it as an estimate — it does not become the sole evidence for a hypothesis.
 
 **Read `data.completeness` on every response and keep it** — one record per slice. It carries
 whether the answer was sampled and how much was read, whether it was de-sampled and whether that
@@ -362,6 +373,11 @@ If a response comes back with **no `completeness` block at all**, the connected 
 and cannot tell you. Do not block and do not guess: build the tab with `unknown` in every column,
 and say at handover that this run cannot report sampling because the Tether connection needs
 updating. An `unknown` a reader can see beats a blank that reads as "fine".
+
+**A missing value inside the block gets the same treatment.** `percentRead` is `null` whenever GA4
+returned no sampling metadata for that query, which is common and is not the same thing as 100%.
+Write `unknown` in that cell, not a blank and not an assumed 100 — the row is still meaningful,
+because `sampled: false` alongside it is GA4 saying it did not sample.
 
 **Pull `totalUsers` alongside sessions on every slice, and converting users alongside conversions.**
 Step 4 powers its tests on users, because that is what a test randomises on, and it cannot go back
