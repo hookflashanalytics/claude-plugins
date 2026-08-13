@@ -215,6 +215,12 @@ often stalls entirely when they step away.
      downstream is wrong.
 5. Capture a screenshot of each step as you go, and note its URL.
 
+**Keep the commentary to one line per step.** "Step 3: added to cart, `add_to_cart` fired" is the
+whole update. The user is waiting to confirm a funnel, not reading a transcript of your reasoning —
+what you inferred, what you tried, what the tag setup implies, and every observation worth keeping
+goes on the Funnel tab of the workbook (see [Step 6](#step-6--build-the-review-workbook)), not into
+chat as you go.
+
 **When the walk blocks, hand that one step over — do not abandon the walk.** A bot challenge, a
 login wall, a step that needs a real registration or policy number: say which step and what it
 needs, ask the user to get you past that one thing, and carry on yourself from the other side. The
@@ -223,9 +229,40 @@ over the whole walk is what this step exists to avoid.
 
 ### 2c. Confirm before you pull
 
-Show the user the derived funnel as a short table — step, event, where it fires, the URL — plus the
-page-type patterns you propose (home, product lander, PLP, PDP, blog…). Ask them to confirm or
-correct it.
+**The confirmation is a table. Not a description of a table, and not a paragraph the user has to
+read to find the funnel in.** They are being asked one question — is this the right journey — and
+they should be able to answer it from a single glance at four columns.
+
+Post exactly this, in this order, and nothing else:
+
+1. **One sentence** saying where the funnel came from ("Derived from GA4 key events and confirmed by
+   walking the site").
+2. **The table.** One row per step, in funnel order:
+
+   | Step | Event | Page URL | Users in range |
+   |---|---|---|---|
+   | 1 | `view_item_list` | `/collections/all` | 84,204 |
+   | 2 | `view_item` | `/products/…` | 48,210 |
+   | 3 | `add_to_cart` | `/products/…` | 17,538 |
+   | 4 | `begin_checkout` | `checkout.client.com/…` | 4,982 |
+   | 5 | `purchase` | `checkout.client.com/thank-you` | 1,331 |
+
+   Those four columns and no others. The URL is the page the event actually fires on, as you observed
+   it in the walk — a real path, not a description of one ("the PDP"). Users in range is there
+   because a funnel that does not descend is a funnel in the wrong order, and that is the single
+   most useful thing on the row for spotting it.
+3. **The page-type patterns** you propose, as one short line each: `PDP: /products/*`.
+4. **Notes, only if there is something the user must know to answer** — at most three, one line
+   each, no paragraphs. "Checkout is on a Shopify domain, so client-side tag capture came back empty;
+   GA4 does record `begin_checkout` and `purchase`."
+5. **The question**, one line.
+
+**Everything else you learned goes in the workbook, not in this message.** Tag architecture, CSP
+behaviour, which sub-report carried the metrics, what you tried before it worked, how you reasoned
+your way to the route — all of it is real and some of it is a genuine finding, and none of it belongs
+in a confirmation prompt. Write it on the Funnel tab, where someone can read it when they want it.
+The same restraint applies during the walk itself: one line per step at most, not a running
+commentary on what you are inferring.
 
 **Wait for a yes.** This is the second and last thing you ask them, and it is the one that protects
 the audit: everything from Step 3 on is measured against this funnel, so a wrong step here does not
@@ -513,7 +550,7 @@ One `.xlsx`, built with openpyxl, in this tab order:
 |---|---|
 | **README** | Client and property name, GA4 property id, measurement id, date range, which channel grouping the audit reports on, the property totals for the range, and a one-line index of every tab. Nothing else — no data-source line, no funnel-type or starting-URL echo, no who-confirmed-it line, no derivation note, no generated timestamp. The reviewer knows how the workbook was made; the README is there to say what is in it |
 | **Data completeness** | One row per data tab, from the records kept in Step 3: rows in the tab, rows GA4 matched, truncated, sampled, % of data read, whether it was de-sampled and whether that came out exact (or why it was skipped), thresholded, `(other)` row present, and a notes column. Second tab deliberately — a caveat you have to scroll to is a caveat nobody reads |
-| **Funnel** | The confirmed funnel as a table (step, event, where it fires, URL), then the step-to-step drop-off tables: whole property, by device, by channel group, by top landing pages |
+| **Funnel** | The confirmed funnel as the same four-column table the user confirmed in 2c (step, event, page URL, users), then a short **Tracking notes** block — this is where everything you learned in the walk and kept out of chat lands: which host the collect endpoint is on, a checkout that lives on a third-party domain, an event firing somewhere unexpected, a step whose tags could not be read client-side. Then the step-to-step drop-off tables: whole property, by device, by channel group, by top landing pages |
 | **One tab per Step 3 slice** | The full table for that slice, named plainly (`Landing pages`, `LP x Device`, `LP x Channel`, `Sources`, `Campaigns`, `Devices`, `New vs returning`, `Countries`, `Daily trend`, `Events by day`, `Items`…). Where the user asked for both channel groupings, the two tabs say which is which (`Channel (default)`, `Channel (custom)`) |
 | **Opportunities** | Every candidate from Step 4 — KEEP, STRETCH and DROP: the measured gap, the segment's users over the range, users per arm, the arm count, the baseline per-user rate, `n·p`, the detectable relative effect (or `cannot be powered`), the verdict, and the reason. The context line states the constant, the confidence and power, and the unit |
 | **Hypotheses** | One row per KEEP or STRETCH test: name, IF, THEN, BECAUSE, evidence (tab + row/segment it traces to), pages, audience, primary metric, secondary metrics, expected MDE, its Step 4 verdict, the seven priority sub-scores, total, rank |
