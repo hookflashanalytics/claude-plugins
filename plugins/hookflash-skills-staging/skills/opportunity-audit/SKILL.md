@@ -404,20 +404,21 @@ hypothesis, but it cannot be the sole evidence for one, and Step 4 says so in th
 reason column.
 
 **Read `data.completeness` on every response and keep it** — one record per slice. It carries
-whether the answer was sampled and how much was read, whether it was de-sampled and whether that
-came out exact, whether rows were **thresholded** (withheld for privacy, so the totals are genuinely
-short), whether a cardinality `(other)` row swallowed the tail, and whether the table was truncated.
-These become the Data completeness tab, and you cannot reconstruct them afterwards.
+whether the answer was sampled, whether it was de-sampled and whether that came out exact, whether
+rows were **thresholded** (withheld for privacy, so the totals are genuinely short), whether a
+cardinality `(other)` row swallowed the tail, and whether the table was truncated. These become the
+Data completeness tab, and you cannot reconstruct them afterwards.
 
 If a response comes back with **no `completeness` block at all**, the connected Tether predates this
 and cannot tell you. Do not block and do not guess: build the tab with `unknown` in every column,
 and say at handover that this run cannot report sampling because the Tether connection needs
 updating. An `unknown` a reader can see beats a blank that reads as "fine".
 
-**A missing value inside the block gets the same treatment.** `percentRead` is `null` whenever GA4
-returned no sampling metadata for that query, which is common and is not the same thing as 100%.
-Write `unknown` in that cell, not a blank and not an assumed 100 — the row is still meaningful,
-because `sampled: false` alongside it is GA4 saying it did not sample.
+**A missing value inside the block gets the same treatment**, and `unknown` still beats a blank in
+any cell the tab does have. **Read sampling off `sampled`, never off `percentRead`** — that field is
+`null` whenever GA4 returned no sampling metadata for the query, which is common and is not the same
+thing as 100%. `sampled: false` beside a null `percentRead` is GA4 saying it did not sample, and
+that is the whole answer.
 
 **Pull `totalUsers` alongside sessions on every slice, and converting users alongside conversions.**
 Step 4 powers its tests on users, because that is what a test randomises on, and it cannot go back
@@ -605,7 +606,7 @@ One `.xlsx`, built with openpyxl, in this tab order:
 | Tab | Contents |
 |---|---|
 | **README** | Client and property name, GA4 property id, measurement id, date range, which channel grouping the audit reports on, the property totals for the range, and a one-line index of every tab. Nothing else — no data-source line, no funnel-type or starting-URL echo, no who-confirmed-it line, no derivation note, no generated timestamp. The reviewer knows how the workbook was made; the README is there to say what is in it |
-| **Data completeness** | One row per data tab, from the records kept in Step 3: rows in the tab, rows GA4 matched, truncated, sampled, % of data read, whether it was de-sampled and whether that came out exact (or why it was skipped), thresholded, `(other)` row present, and a notes column. Second tab deliberately — a caveat you have to scroll to is a caveat nobody reads |
+| **Data completeness** | One row per data tab, from the records kept in Step 3: rows in the tab, rows GA4 matched, truncated, sampled, whether it was de-sampled and whether that came out exact (or why it was skipped), thresholded, `(other)` row present, and a notes column. **No "% of data read" column** — `sampled` already answers the question the tab is asked, and a percentage that is `null` more often than not invited a reader to treat a blank as 100%. Second tab deliberately — a caveat you have to scroll to is a caveat nobody reads |
 | **Funnel**, then **Funnel x Device**, **Funnel x Channel** and **Funnel x Landing page** | The confirmed funnel joined to its whole-property drop-off, then one crosstab per tab. One table per sheet, laid out as [The funnel tabs](#the-funnel-tabs) describes. **No Tracking notes block** |
 | **One tab per Step 3 slice** | The full table for that slice, named plainly (`Landing pages`, `LP x Device`, `LP x Channel`, `Sources`, `Campaigns`, `Devices`, `New vs returning`, `Countries`, `Daily trend`, `Events by day`, `Items`…). Where the user asked for both channel groupings, the two tabs say which is which (`Channel (default)`, `Channel (custom)`) |
 | **Opportunities** | Every candidate from Step 4 — KEEP, STRETCH and DROP: the measured gap, the segment's users over the range, users per arm, the arm count, the baseline per-user rate, `n·p`, the detectable relative effect (or `cannot be powered`), the verdict, and the reason. The context line states the constant, the confidence and power, and the unit |
