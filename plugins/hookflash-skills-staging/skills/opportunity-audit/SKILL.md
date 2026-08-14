@@ -606,7 +606,7 @@ One `.xlsx`, built with openpyxl, in this tab order:
 | Tab | Contents |
 |---|---|
 | **README** | Client and property name, GA4 property id, measurement id, date range, which channel grouping the audit reports on, the property totals for the range, and a one-line index of every tab. Nothing else — no data-source line, no funnel-type or starting-URL echo, no who-confirmed-it line, no derivation note, no generated timestamp. The reviewer knows how the workbook was made; the README is there to say what is in it |
-| **Data completeness** | One row per data tab, from the records kept in Step 3: rows in the tab, rows GA4 matched, truncated, sampled, whether it was de-sampled and whether that came out exact (or why it was skipped), thresholded, `(other)` row present, and a notes column. **No "% of data read" column** — `sampled` already answers the question the tab is asked, and a percentage that is `null` more often than not invited a reader to treat a blank as 100%. Second tab deliberately — a caveat you have to scroll to is a caveat nobody reads |
+| **Data completeness** | One row per data tab, from the records kept in Step 3: rows in the tab, rows GA4 matched, truncated, sampled, whether it was de-sampled and whether that came out exact (or why it was skipped), thresholded, `(other)` row present, and a notes column. **No "% of data read" column** — `sampled` already answers the question the tab is asked, and a percentage that is `null` more often than not invited a reader to treat a blank as 100%. Second tab deliberately — a caveat you have to scroll to is a caveat nobody reads. See [What belongs in the Tab column](#what-belongs-in-the-tab-column) |
 | **Funnel**, then **Funnel x Device**, **Funnel x Channel** and **Funnel x Landing page** | The confirmed funnel joined to its whole-property drop-off, then one crosstab per tab. One table per sheet, laid out as [The funnel tabs](#the-funnel-tabs) describes. **No Tracking notes block** |
 | **One tab per Step 3 slice** | The full table for that slice, named plainly (`Landing pages`, `LP x Device`, `LP x Channel`, `Sources`, `Campaigns`, `Devices`, `New vs returning`, `Countries`, `Daily trend`, `Events by day`, `Items`…). Where the user asked for both channel groupings, the two tabs say which is which (`Channel (default)`, `Channel (custom)`) |
 | **Opportunities** | Every candidate from Step 4 — KEEP, STRETCH and DROP: the measured gap, the segment's users over the range, users per arm, the arm count, the baseline per-user rate, `n·p`, the detectable relative effect (or `cannot be powered`), the verdict, and the reason. The context line states the constant, the confidence and power, and the unit |
@@ -632,6 +632,27 @@ Rules for the build:
   Not the source tool — every tab has the same source and repeating it fifteen times is noise.
 - **Do not trim, round away, or top-N a tab to make it tidy.** Comprehensiveness is what the team
   asked to see.
+
+### What belongs in the Tab column
+
+**Every value in the Data completeness tab's `Tab` column is the name of a worksheet in this
+workbook, spelled exactly as the sheet is spelled.** Nothing else goes in that column, ever. If a
+value there does not match a sheet name, the row should not exist.
+
+That means rows for the data tabs and nothing more. **No rows for `README`, `Data completeness`,
+`Opportunities` or `Hypotheses`** — none of them comes from a GA4 response, so there is no
+completeness to report and the row can only be blank. A blank row on a completeness tab is worse
+than no row: it reads as a tab that was checked and found fine.
+
+**And no rows for your data-quality flags.** The shipped run put
+`DISQUALIFIED: United States traffic`, `DISQUALIFIED: China traffic`,
+`DISQUALIFIED: view_cart as a funnel step` and five more like them in the `Tab` column, each one
+wrapping to five lines and leaving the rest of the row empty. Those are the Step 3 plausibility
+gates, they are real and they matter, and they already have two homes: **the reason column of the
+Opportunities row they disqualified, and the flags you raise in chat at handover** (see
+[Deliver](#deliver)). A disqualification is a judgement about a number. This tab is a mechanical
+record of what GA4 said about a response. Putting one in the other's table makes both harder to
+read and makes the tab's row count meaningless.
 
 ### The funnel tabs
 
@@ -1013,10 +1034,13 @@ means that block was built from event counts rather than `run_ga4_funnel_report`
 block is wrong rather than one cell. **Check the widths too** — for every sheet, assert that each column's
 width is at least the longest `display_len` in it (or that the column wraps and is at `MAX_W`), and
 that every context line is either unwrapped with no row height or merged with one — a wrapped
-banner with no height set is the crammed-cell bug. **Check the Data completeness tab has a row for
-every data tab in the workbook** and no rows for tabs that do not exist: a missing row reads as
-"that tab was fine". Those checks cost nothing and catch a tab you built before adding a long row.
-Fix and rebuild anything that fails; never deliver a workbook you have not reopened.
+banner with no height set is the crammed-cell bug. **Assert set equality on the Data completeness tab**: the
+values in its `Tab` column, as a set, equal `wb.sheetnames` minus `README`, `Data completeness`,
+`Opportunities` and `Hypotheses` — no extras, nothing missing, and every value an exact sheet name.
+A missing row reads as "that tab was fine", and an extra row is either a tab you renamed or a
+data-quality flag that has wandered onto the wrong tab. Set equality catches both, where eyeballing
+the column catches neither. Those checks cost nothing and catch a tab you built before adding a long
+row. Fix and rebuild anything that fails; never deliver a workbook you have not reopened.
 
 **Check the charts, and check them properly.** A chart that failed to build leaves no error behind,
 just a tab that looks like the old workbook, and every fault the last round was reviewed for was
