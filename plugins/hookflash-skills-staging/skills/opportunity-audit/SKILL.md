@@ -208,8 +208,9 @@ often stalls entirely when they step away.
    - **The buffer resets on every page navigation**, which is why you must read once per page. On a
      single-page-app funnel it never resets and one read at the end gets everything.
    - **The collect endpoint is often first-party** (`metrics.client.com/g/collect`, not
-     `google-analytics.com`) because of server-side tagging. Match on the path, as above. Record
-     whichever host you actually saw — it goes on the Funnel tab.
+     `google-analytics.com`) because of server-side tagging. Match on the path, as above. Note
+     whichever host you actually saw — it is a tracking observation, so it goes in the handover
+     message, not in the workbook.
    - The `tid` parameter gives you the measurement ID for free. Cross-check it against the property
      you resolved in Step 1; if they disagree, you are looking at the wrong property and everything
      downstream is wrong.
@@ -217,9 +218,8 @@ often stalls entirely when they step away.
 
 **Keep the commentary to one line per step.** "Step 3: added to cart, `add_to_cart` fired" is the
 whole update. The user is waiting to confirm a funnel, not reading a transcript of your reasoning —
-what you inferred, what you tried, what the tag setup implies, and every observation worth keeping
-goes on the Funnel tab of the workbook (see [Step 6](#step-6--build-the-review-workbook)), not into
-chat as you go.
+what you inferred, what you tried and what the tag setup implies is held back for the handover
+message at the end (see [Deliver](#deliver)), not narrated into chat as you go.
 
 **When the walk blocks, hand that one step over — do not abandon the walk.** A bot challenge, a
 login wall, a step that needs a real registration or policy number: say which step and what it
@@ -257,10 +257,14 @@ Post exactly this, in this order, and nothing else:
    GA4 does record `begin_checkout` and `purchase`."
 5. **The question**, one line.
 
-**Everything else you learned goes in the workbook, not in this message.** Tag architecture, CSP
-behaviour, which sub-report carried the metrics, what you tried before it worked, how you reasoned
-your way to the route — all of it is real and some of it is a genuine finding, and none of it belongs
-in a confirmation prompt. Write it on the Funnel tab, where someone can read it when they want it.
+**Everything else you learned waits for the handover, and none of it goes in the workbook.** Tag
+architecture, CSP behaviour, which sub-report carried the metrics, what you tried before it worked,
+how you reasoned your way to the route — all of it is real and some of it is a genuine finding, and
+none of it belongs in a confirmation prompt. Keep it for the tracking observations at
+[Deliver](#deliver), where it is two or three sentences to the person who ran the audit. **It does
+not become a tab or a block in the workbook.** The workbook goes to the experimentation team, who
+are reading it to decide what to test; how the client's tags are wired is not their question, and a
+Tracking notes block sitting above the drop-off tables is the first thing they have to scroll past.
 The same restraint applies during the walk itself: one line per step at most, not a running
 commentary on what you are inferring.
 
@@ -282,7 +286,7 @@ step-to-step drop-off.
 | Slice | What it can reveal |
 |---|---|
 | Step-to-step drop-off, whole funnel | Where the leak is |
-| Step-to-step drop-off by device, by channel group, and by top landing pages | Whose leak it is |
+| Step-to-step drop-off by device and by channel group | Whose leak it is |
 | Each funnel step × device category | Where the volume is vs where the conversion is |
 | Each funnel step × channel group | Which traffic gets how deep |
 | Landing page × sessions × conversions × conversion rate† | The pages worth testing at all |
@@ -303,6 +307,16 @@ step-to-step drop-off.
 for.** Pull the two counts — `sessions` (and `totalUsers`) with `keyEvents` — and divide in the
 workbook. Asking for `sessionKeyEventRate` or `userKeyEventRate` directly costs you the de-sampling
 below, so the tab comes back an estimate for no gain.
+
+**Both broken-down drop-offs come from `run_ga4_funnel_report` with `breakdown_dimension` set** —
+`deviceCategory` for one, the chosen channel dimension for the other, `breakdown_limit` up to 15.
+Not from an event-count slice broken down by the same dimension. It looks like the same table and it
+is not: the funnel report counts users who reached step N *having passed through the steps before
+it*, so its per-step counts nest and its completion rates are real. Event counts do not nest — a
+channel whose users mostly skip the collection page and land straight on a PDP produces
+`view_item ÷ view_item_list` of **1,400%**, which is arithmetic, not a funnel. If a breakdown value
+the user cares about falls outside `breakdown_limit`, run the funnel again filtered to that value
+rather than reconstructing it from event counts.
 
 **Wherever a slice is broken down by channel, use the grouping the user chose in Step 1.** If they
 asked for both, that slice gets **two tabs** — one per grouping, each named for the grouping it
@@ -357,11 +371,26 @@ It has three limits worth knowing before you design a query:
 - **`metric_filters` block it**, because GA4 applies them inside each bucket, so a row that only
   clears the threshold in total would disappear. Pull the rows and filter them yourself.
 - **`run_ga4_funnel_report` has no `desample` parameter at all**, and neither does a pivot. Do not
-  go looking for one and never say you set one. A funnel or pivot answer still reports its own
-  completeness, so a sampled one can be *recorded* but not *fixed*: for a pivot, re-pull it flat and
-  de-sample that (see the daily-events tab above); for a funnel, shorten the range or narrow the
-  breakdown and pull it again, and if it is still sampled, say so on the tab and treat every
-  step-to-step rate on it as an estimate — it does not become the sole evidence for a hypothesis.
+  go looking for one and never say you set one. Both still report their own completeness, so a
+  sampled answer from either can be *recorded* — but only one of them can be *fixed*.
+
+**A sampled funnel has no workaround, and the workbook has to say so.** A pivot does: re-pull it
+flat and de-sample that (see the daily-events tab above), same tab, exact numbers. A funnel does
+not. Shortening the range or dropping the breakdown may well return an unsampled answer, but it is
+an answer to a *different question* — a shorter range is not the range the rest of the audit reports
+on, and a funnel without its breakdown is not the tab you were asked for. That is a trade, not a
+fix, and it must never be presented as one. So when a funnel answer comes back sampled, record it in
+three places and move on:
+
+1. The **Funnel tab's context line**, on the drop-off block it applies to.
+2. Its row on **Data completeness**, with `no workaround: GA4 cannot de-sample a funnel report` in
+   the notes column. A sampled row with an empty notes column reads as an oversight; this is the one
+   case where the reader needs to know that nothing was left undone.
+3. **One sentence at handover.**
+
+Every step-to-step rate on a sampled funnel tab is then an estimate. It can still motivate a
+hypothesis, but it cannot be the sole evidence for one, and Step 4 says so in that candidate's
+reason column.
 
 **Read `data.completeness` on every response and keep it** — one record per slice. It carries
 whether the answer was sampled and how much was read, whether it was de-sampled and whether that
@@ -566,7 +595,7 @@ One `.xlsx`, built with openpyxl, in this tab order:
 |---|---|
 | **README** | Client and property name, GA4 property id, measurement id, date range, which channel grouping the audit reports on, the property totals for the range, and a one-line index of every tab. Nothing else — no data-source line, no funnel-type or starting-URL echo, no who-confirmed-it line, no derivation note, no generated timestamp. The reviewer knows how the workbook was made; the README is there to say what is in it |
 | **Data completeness** | One row per data tab, from the records kept in Step 3: rows in the tab, rows GA4 matched, truncated, sampled, % of data read, whether it was de-sampled and whether that came out exact (or why it was skipped), thresholded, `(other)` row present, and a notes column. Second tab deliberately — a caveat you have to scroll to is a caveat nobody reads |
-| **Funnel** | The confirmed funnel as the same four-column table the user confirmed in 2c (step, event, page URL, users), then a short **Tracking notes** block — this is where everything you learned in the walk and kept out of chat lands: which host the collect endpoint is on, a checkout that lives on a third-party domain, an event firing somewhere unexpected, a step whose tags could not be read client-side. Then the step-to-step drop-off tables: whole property, by device, by channel group, by top landing pages |
+| **Funnel** | The confirmed funnel as the same four-column table the user confirmed in 2c (step, event, page URL, users), then the drop-off: whole property, then by device, then by channel group. Laid out as [The Funnel tab](#the-funnel-tab) describes. **No Tracking notes block and no landing-page breakdown** |
 | **One tab per Step 3 slice** | The full table for that slice, named plainly (`Landing pages`, `LP x Device`, `LP x Channel`, `Sources`, `Campaigns`, `Devices`, `New vs returning`, `Countries`, `Daily trend`, `Events by day`, `Items`…). Where the user asked for both channel groupings, the two tabs say which is which (`Channel (default)`, `Channel (custom)`) |
 | **Opportunities** | Every candidate from Step 4 — KEEP, STRETCH and DROP: the measured gap, the segment's users over the range, users per arm, the arm count, the baseline per-user rate, `n·p`, the detectable relative effect (or `cannot be powered`), the verdict, and the reason. The context line states the constant, the confidence and power, and the unit |
 | **Hypotheses** | One row per KEEP or STRETCH test: name, IF, THEN, BECAUSE, evidence (tab + row/segment it traces to), pages, audience, primary metric, secondary metrics, expected MDE, its Step 4 verdict, the seven priority sub-scores, total, rank |
@@ -591,6 +620,45 @@ Rules for the build:
   Not the source tool — every tab has the same source and repeating it fifteen times is noise.
 - **Do not trim, round away, or top-N a tab to make it tidy.** Comprehensiveness is what the team
   asked to see.
+
+### The Funnel tab
+
+This tab answers one question — where does this funnel leak, and for whom — so everything on it is
+the funnel, read in funnel order. Four blocks, in this order, and nothing else:
+
+1. **The confirmed funnel**, the four-column table from 2c.
+2. **Whole-property drop-off**: step, active users, completion rate, abandonments, abandonment rate.
+3. **By device**, one block per device category.
+4. **By channel group**, one block per channel. Where the user asked for both groupings, the custom
+   blocks follow the default ones under their own heading.
+
+**Blocks 3 and 4 are grouped by the breakdown value, not by the step.** Each device and each channel
+gets its own small heading and its own complete funnel underneath it, steps in funnel order, exactly
+like block 2:
+
+```
+Organic Search
+Step | Event            | Active users | Completion rate | Abandonments
+1    | view_item_list   |       84,204 |                 |
+2    | view_item        |       48,210 |           57.3% |       35,994
+3    | add_to_cart      |       17,538 |           36.4% |       30,672
+```
+
+Then the next channel, then the next. **What this replaces is one long table of every
+(channel, step) pair sorted by user count**, which is what the first runs produced: reading one
+channel's funnel out of it means finding five rows scattered across seventy, and comparing two
+channels means doing that twice and holding it in your head. The team reads this tab a channel at a
+time, so the table is laid out a channel at a time. Order the blocks by the first step's users,
+descending, so the channels that matter are at the top.
+
+Two things not on this tab, both deliberate:
+
+- **No landing-page breakdown.** A funnel per landing page is the same information the
+  `Landing pages` and `LP x Channel` tabs already carry at full depth, and it made this tab twice as
+  long as everything else on it put together.
+- **No Tracking notes block.** Tracking observations go in the handover message (see
+  [Deliver](#deliver)). This tab is for the experimentation team, and how the tags are wired is not
+  what they are here to read.
 
 ### Column widths and context lines
 
@@ -708,15 +776,19 @@ Three traps in the width code, all of which produce a wrong width silently:
 
 ### Charts
 
-One chart per tab where a chart says something the table does not, **anchored to the right of the
-table on that same tab**. A chart is a reading aid, not decoration: if the tab is a lookup table
-(`Sources` with 400 rows, `Items` with 90 products), the chart plots the head of it and its title
-says so.
+Every chart in this workbook is built by the one function below, so that fifteen tabs produce
+fifteen charts that look like they belong together. **Do not hand-roll a chart for one tab** — if a
+tab needs something the function does not do, add the argument rather than writing a second
+chart-builder, or the workbook ends up with two visual languages in it.
+
+A chart is a reading aid, not decoration: it goes to the right of the table on that same tab, and if
+the tab is a lookup table (`Sources` with 400 rows, `Items` with 90 products) the chart plots the
+head of it and its title says so.
 
 | Tab | Chart | Plotted against |
 |---|---|---|
-| Funnel | Bar, users per step, in funnel order | Never sorted by size — the order *is* the finding |
-| Landing pages, LP x Device, LP x Channel, page types | Bar of sessions, top 15 rows, with conversion rate on a **secondary axis** | A rate against session counts is invisible on one axis |
+| Funnel | Three: (1) bar, active users per step, funnel order; (2) grouped bar, step completion rate by device; (3) grouped bar, step completion rate by channel, top 6 channels | Never sorted by size — the order *is* the finding. Charts 2 and 3 plot the *rate*, not the users, because that is what makes two segments of different size comparable |
+| Landing pages, LP x Device, LP x Channel, Page types | Bar of sessions, top 15 rows, with conversion rate on a **secondary axis** | A rate against session counts is invisible on one axis |
 | Channel, Sources, Campaigns, Devices, Countries, New vs returning | Bar of sessions with conversion rate on a secondary axis, top 15 | |
 | Daily trend | Line, sessions and conversions by date, conversions on a secondary axis | |
 | Events by day | Line, one series per event, top 8 events only | 20 lines is a scribble; the table still holds all 20 |
@@ -724,35 +796,92 @@ says so.
 | Opportunities | Bar of the detectable relative effect per candidate, KEEP first | `cannot be powered` rows are left out of the chart and stay in the table |
 | Data completeness, Hypotheses, README | No chart | Neither prose nor a manifest plots |
 
+**Every chart is labelled on both axes.** Pass `x_title` and `y_title` on every call, and `y2_title`
+whenever there is a secondary series. A chart whose axes are unlabelled is asking the reader to
+guess what they are looking at, and the numbers on this workbook are the whole point of it.
+
 ```python
+import openpyxl
 from openpyxl.chart import BarChart, LineChart, Reference
+from openpyxl.chart.axis import ChartLines
+from openpyxl.chart.shapes import GraphicalProperties
+from openpyxl.chart.text import RichText
+from openpyxl.drawing.line import LineProperties
+from openpyxl.drawing.text import (
+    CharacterProperties, Font as DrawFont, Paragraph, ParagraphProperties, RichTextProperties,
+)
+from openpyxl.utils import get_column_letter
 
-TAPA_BLUE, TAPA_INK = "2F6BED", "9AA5B1"
+TAPA_BLUE, TAPA_INK, GRID, INK = "2F6BED", "9AA5B1", "E2E1E0", "26241F"
+AXIS_TEXT = "595959"
+# Multi-series charts only. Single-series charts are always TAPA_BLUE.
+SERIES_COLOURS = ["2F6BED", "0A7D51", "8755B9", "C43F3E", "E08A1E", "1D76BC", "6B7A8F", "17A2A2"]
 
-def add_chart(ws, *, kind, header_row, first_row, last_row, cat_col,
-              value_cols, secondary=(), title, anchor_col, number_format=None):
+
+def _text(size=900, bold=False, colour=AXIS_TEXT):
+    return RichText(p=[Paragraph(pPr=ParagraphProperties(
+        defRPr=CharacterProperties(sz=size, b=bold, solidFill=colour,
+                                   latin=DrawFont(typeface="Calibri"))),
+        endParaRPr=CharacterProperties(sz=size))])
+
+
+def _style_axis(axis, *, title, number_format=None, gridlines=False, rotation=None):
+    axis.delete = False                    # openpyxl leaves this unset and Excel hides the axis
+    axis.title = title
+    if axis.title is not None:
+        axis.title.overlay = False
+        axis.title.tx.rich.p[0].pPr = ParagraphProperties(
+            defRPr=CharacterProperties(sz=900, b=False, solidFill=AXIS_TEXT))
+    if number_format:
+        axis.numFmt = number_format
+    axis.majorTickMark, axis.minorTickMark = "out", "none"
+    axis.spPr = GraphicalProperties(ln=LineProperties(solidFill=GRID, w=9525))
+    axis.txPr = _text()
+    if rotation is not None:
+        axis.txPr.bodyPr = RichTextProperties(rot=rotation, vert="horz")
+    axis.majorGridlines = ChartLines(
+        spPr=GraphicalProperties(ln=LineProperties(solidFill=GRID, w=9525))) if gridlines else None
+
+
+def add_chart(ws, *, kind, header_row, first_row, last_row, cat_col, value_cols,
+              title, x_title, y_title, anchor_col, secondary=(), y2_title=None,
+              y_format="#,##0", y2_format="0.0%", rotate_labels=True):
     """One chart, anchored two columns clear of the table on the same sheet.
 
-    `value_cols`/`secondary` are 1-based column indexes. Anything in `secondary`
-    is drawn as a line on the right-hand axis — a 1.9% rate and a 40,000-session
-    bar cannot share one axis, and forcing them to makes the rate a flat line
-    along zero.
+    `value_cols`/`secondary` are 1-based column indexes. Anything in `secondary` is drawn as a
+    line on the right-hand axis — a 1.9% rate and a 40,000-session bar cannot share one axis,
+    and forcing them to makes the rate a flat line along zero.
     """
     primary = BarChart() if kind == "bar" else LineChart()
     primary.title = title
-    # Without this the title is drawn INSIDE the plot area and lands on top of
-    # the tick labels.
-    primary.title.overlay = False
-    primary.height, primary.width = 8, 16
-    cats = Reference(ws, min_col=cat_col, min_row=first_row, max_row=last_row)
+    primary.title.overlay = False          # or Excel draws it inside the plot area
+    primary.title.tx.rich.p[0].pPr = ParagraphProperties(
+        defRPr=CharacterProperties(sz=1100, b=True, solidFill=INK))
+    primary.height, primary.width = 8.5, 17
+    primary.roundedCorners = False
+    primary.varyColors = False             # or a one-series bar gets a colour and a legend per point
 
+    cats = Reference(ws, min_col=cat_col, min_row=first_row, max_row=last_row)
     for col in value_cols:
         primary.add_data(Reference(ws, min_col=col, min_row=header_row, max_row=last_row),
                          titles_from_data=True)
     primary.set_categories(cats)
-    for series in primary.series:
-        series.graphicalProperties.solidFill = TAPA_BLUE
-        series.graphicalProperties.line.solidFill = TAPA_BLUE
+    n_series = len(primary.series)
+    multi = n_series > 1
+    for i, s in enumerate(primary.series):
+        colour = SERIES_COLOURS[i % len(SERIES_COLOURS)] if multi else TAPA_BLUE
+        if kind == "bar":
+            s.graphicalProperties.solidFill = colour
+            s.graphicalProperties.line.noFill = True
+        else:
+            s.graphicalProperties.line.solidFill = colour
+            s.graphicalProperties.line.width = 20000
+            s.marker.symbol, s.smooth = "none", False
+
+    _style_axis(primary.x_axis, title=x_title,
+                rotation=(-2700000 if rotate_labels else None))   # -45 degrees, in 1/60000ths
+    _style_axis(primary.y_axis, title=y_title, number_format=y_format, gridlines=True)
+    primary.x_axis.axPos, primary.y_axis.axPos = "b", "l"   # openpyxl defaults the cat axis to "l"
 
     if secondary:
         right = LineChart()
@@ -760,34 +889,72 @@ def add_chart(ws, *, kind, header_row, first_row, last_row, cat_col,
             right.add_data(Reference(ws, min_col=col, min_row=header_row, max_row=last_row),
                            titles_from_data=True)
         right.set_categories(cats)
-        for series in right.series:
-            series.graphicalProperties.line.solidFill = TAPA_INK
-            series.smooth = False
-        right.y_axis.axId = 200          # a second axis needs its own id
-        right.y_axis.title = None
-        right.y_axis.crosses = "max"     # ... and must cross at the far side
-        if number_format:
-            right.y_axis.numFmt = number_format
+        for s in right.series:
+            s.graphicalProperties.line.solidFill = TAPA_INK
+            s.graphicalProperties.line.width = 20000
+            s.marker.symbol, s.smooth = "none", False
+        right.y_axis.axId = 200            # a second axis needs its own id
+        right.y_axis.crosses = "max"       # ... and must cross at the far side
+        _style_axis(right.y_axis, title=y2_title, number_format=y2_format, gridlines=False)
+        right.x_axis = primary.x_axis
+        n_series += len(right.series)      # count BEFORE the merge, see below
         primary += right
+
+    if n_series > 1:
+        primary.legend.position, primary.legend.overlay = "b", False
+        primary.legend.txPr = _text()
+    else:
+        primary.legend = None              # one series needs no legend, and Excel legends the points
 
     ws.add_chart(primary, f"{get_column_letter(anchor_col)}{header_row}")
 ```
 
-Four things that go wrong, in order of how easily they go unnoticed:
+**Long category labels get a `Chart label` column.** Excel truncates a rotated axis label to
+whatever fits and appends an ellipsis, so a landing-page chart comes back as fifteen bars captioned
+`/products/currentbody-…`, all identical. **A rotated label holds about 24 characters at this chart
+size**, so wherever the category text can run past that — `Landing pages`, `LP x Device`,
+`LP x Channel`, `Sources`, `Campaigns`, `Items`, `Countries`, and any other text category — write
+one extra column immediately to the right of the table, headed `Chart label`, holding the shortened
+form (`text if len(text) <= 24 else "..." + text[-21:]`, which keeps the tail, where the pages
+differ), point `cat_col` at that column and anchor the chart two columns clear of *it*. Keep it out
+of the autofilter range: it is a chart aid, not data.
 
-- **Anchor charts last, after `fit_columns` and `fit_banner_rows`.** The anchor is a cell reference,
-  so a chart placed before the widths are final ends up sitting on top of the table it belongs to.
-  Two columns clear of the last populated column, at the header row.
+The two funnel comparison charts have the same problem and a neater answer than truncation: their
+categories are step transitions, and a completion rate belongs to the step it lands on, so **label
+them by the destination step alone** — `-> add_to_cart`, `-> begin_checkout`, `-> purchase`. Short,
+unambiguous, and no ellipsis. `add_to_cart -> begin_checkout` is 29 characters and comes back cut.
+
+Six things that go wrong, in order of how easily they go unnoticed. The first three were all
+present in every chart of the first runs and are the reason those charts had no axes at all:
+
+- **`delete` is unset by default, and Excel reads that as "hide this axis".** Nothing errors, and
+  what you get is the chart the reviewer described as rudimentary: no tick labels, no numbers, no
+  category names, just bars floating over gridlines. `_style_axis` sets `delete = False` on every
+  axis including the secondary one, and that single line is most of the difference.
+- **A second value axis brings its own gridlines, and two sets at two different scales is the mess
+  of unevenly spaced horizontal rules** the reviewer flagged on `Page types` — they are not
+  mis-spaced, they are two evenly spaced sets drawn over each other. Only the primary value axis
+  gets `majorGridlines`; the secondary gets `None`.
+- **openpyxl defaults the category axis to `axPos="l"`**, which is not where a column chart's
+  categories go. Set it to `"b"` explicitly.
+- **A series can be drawn across the chart title.** With the axes hidden, Excel gives the plot area
+  the full frame right up to the top edge, so a rate that peaks near the axis maximum is drawn
+  through the title text. `title.overlay = False` alone does not prevent it — the axes have to exist
+  for Excel to reserve the title band. Fixed by the first bullet, but check for it: the tabs where
+  it shows are the ones whose secondary series peaks on an early category.
 - **A rate on the primary axis is a flat line at zero.** Rates are stored as fractions, so 0.019
-  plotted beside 40,000 has no visible height at all. Any chart mixing a volume and a rate needs the
-  secondary axis, and the rate series needs its `0.0%` format on that axis too.
-- **Plot from the sorted table, and cap the categories.** A bar chart with 400 categories renders as
-  a grey smear. Take the head of the table as the table is already ordered, and put the cap in the
-  title (`Sessions and conversion rate, top 15 of 412 landing pages`) so nobody reads it as the
-  whole picture.
-- **Do not chart a `cannot be powered` row.** There is no number to plot, and openpyxl will happily
-  draw the text as a zero-height bar that reads as "no effect detectable" rather than "not
-  measurable".
+  plotted beside 40,000 has no visible height. Any chart mixing a volume and a rate needs the
+  secondary axis and its `0.0%` format.
+- **After `primary += right`, `primary.series` still holds only the primary's own series.** The
+  secondary chart's series are reachable, but not there, so `len(primary.series)` on a bar-plus-rate
+  chart is 1 and a naive "hide the legend when there is one series" test strips the legend from
+  exactly the charts that need one — the reader can no longer tell the bars from the line. Count
+  before the merge, which is what `n_series` above is for.
+- **Plot from the sorted table, cap the categories, and never chart a `cannot be powered` row.** A
+  bar chart with 400 categories is a grey smear, so take the head of the already-ordered table and
+  put the cap in the title (`top 15 of 412 landing pages`) so nobody reads it as the whole picture.
+  A `cannot be powered` row has no number to plot and openpyxl draws the text as a zero-height bar,
+  which reads as "no effect detectable" rather than "not measurable".
 
 Then **verify before handover (ADR-0006)**: reopen the file with openpyxl and check that every
 expected tab exists and holds the rows you meant to write, spot-check at least three numbers
@@ -798,13 +965,30 @@ wrong `p` — and confirm no row prints a detectable effect where `n·p < 10` or
 0.5. **Check the widths too** — for every sheet, assert that each column's
 width is at least the longest `display_len` in it (or that the column wraps and is at `MAX_W`), and
 that every context line is either unwrapped with no row height or merged with one — a wrapped
-banner with no height set is the crammed-cell bug. **Check the charts exist** — `len(ws._charts)`
-is 1 on every tab the table above says gets one, and 0 on README, Data completeness and Hypotheses;
-a chart that failed to build leaves no error behind, just a tab that looks like the old workbook.
-**Check the Data completeness tab has a row for every data tab in the workbook** and no rows for
-tabs that do not exist: a missing row reads as "that tab was fine". Those checks cost nothing and
-catch a tab you built before adding a long row. Fix and rebuild
-anything that fails; never deliver a workbook you have not reopened.
+banner with no height set is the crammed-cell bug. **Check the Data completeness tab has a row for
+every data tab in the workbook** and no rows for tabs that do not exist: a missing row reads as
+"that tab was fine". Those checks cost nothing and catch a tab you built before adding a long row.
+Fix and rebuild anything that fails; never deliver a workbook you have not reopened.
+
+**Check the charts, and check them properly.** A chart that failed to build leaves no error behind,
+just a tab that looks like the old workbook, and every fault the last round was reviewed for was
+silent. So for each chart, assert:
+
+- `len(ws._charts)` is 3 on Funnel, 1 on every tab the table above says gets one, and 0 on README,
+  Data completeness and Hypotheses.
+- **`x_axis.delete` and `y_axis.delete` are both `False`, not `None`** — `None` is the default and
+  it means "no axis". If there is a secondary axis, check it too. This is the single check that
+  would have caught the whole last round.
+- Exactly **one** axis on the chart carries `majorGridlines`.
+- `x_axis.title` and `y_axis.title` are set, and `y2_title` wherever there is a secondary series.
+- The chart's anchor column is clear of the last populated column (including a `Chart label`
+  column, where the tab has one), so no chart sits on top of its own table.
+
+**Reading the XML back is not the same as seeing the chart.** If this session can drive Excel
+(Windows COM: `$co.Chart.Export("chart.png","PNG")` per `ChartObject`), export one chart from a tab
+with a secondary axis and one from a tab with a single series, and look at them: both axes labelled,
+one set of evenly spaced gridlines, the title clear of every series, no ellipsis in the category
+labels. If it cannot, say at handover that the charts were verified structurally but not rendered.
 
 ## Deliver
 
@@ -816,12 +1000,17 @@ Hand over the workbook file, and in chat:
 - **completeness in one or two sentences**, pointing at the tab: how many tabs came back exact, how
   many were sampled and de-sampled, anything that could not be de-sampled and why, and anything
   thresholded or truncated. "All 18 tabs exact" is a perfectly good version of this and worth
-  saying — the team asked how they would know, so silence is not an answer
+  saying — the team asked how they would know, so silence is not an answer. **If a funnel came back
+  sampled, say that there is no workaround for it** rather than leaving it as an unexplained gap
 - the headline findings, briefly — three to five, each with its number
 - tests proposed and candidates dropped, as counts
 - **the data-quality flags from Step 3**, in plain sentences: what looked wrong, where, and what
   you disqualified because of it. This is the only place they appear, so do not compress them to
   "some data-quality issues were found"
+- **the tracking observations from the walk**, two or three sentences at most: the collect endpoint
+  host, a checkout on a third-party domain, an event firing somewhere unexpected, a step whose tags
+  could not be read client-side. This is the one place they go — they are a real finding for whoever
+  ran the audit, and they are not for the workbook
 
 Say plainly that this phase produces no deck: the workbook **is** the deliverable, for the
 experimentation team to review the foundation the deck will later stand on.

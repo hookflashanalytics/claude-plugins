@@ -16,7 +16,7 @@
       "name": "hookflash-skills-staging",
       "source": "./plugins/hookflash-skills-staging",
       "description": "TESTING ONLY — do not install unless AI Ops asked you to. Unproven skills that may break or change without notice. Requires hookflash-skills (it supplies the Tether connection). If one misbehaves, tell Connor rather than working around it.",
-      "version": "0.11.2"
+      "version": "0.12.0"
     }
   ]
 }
