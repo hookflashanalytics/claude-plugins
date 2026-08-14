@@ -606,7 +606,7 @@ One `.xlsx`, built with openpyxl, in this tab order:
 |---|---|
 | **README** | Client and property name, GA4 property id, measurement id, date range, which channel grouping the audit reports on, the property totals for the range, and a one-line index of every tab. Nothing else — no data-source line, no funnel-type or starting-URL echo, no who-confirmed-it line, no derivation note, no generated timestamp. The reviewer knows how the workbook was made; the README is there to say what is in it |
 | **Data completeness** | One row per data tab, from the records kept in Step 3: rows in the tab, rows GA4 matched, truncated, sampled, % of data read, whether it was de-sampled and whether that came out exact (or why it was skipped), thresholded, `(other)` row present, and a notes column. Second tab deliberately — a caveat you have to scroll to is a caveat nobody reads |
-| **Funnel** | The confirmed funnel as the same four-column table the user confirmed in 2c (step, event, page URL, users), then the drop-off: whole property, then a crosstab each by device, channel group and landing page. Laid out as [The Funnel tab](#the-funnel-tab) describes. **No Tracking notes block** |
+| **Funnel**, then **Funnel x Device**, **Funnel x Channel** and **Funnel x Landing page** | The confirmed funnel joined to its whole-property drop-off, then one crosstab per tab. One table per sheet, laid out as [The funnel tabs](#the-funnel-tabs) describes. **No Tracking notes block** |
 | **One tab per Step 3 slice** | The full table for that slice, named plainly (`Landing pages`, `LP x Device`, `LP x Channel`, `Sources`, `Campaigns`, `Devices`, `New vs returning`, `Countries`, `Daily trend`, `Events by day`, `Items`…). Where the user asked for both channel groupings, the two tabs say which is which (`Channel (default)`, `Channel (custom)`) |
 | **Opportunities** | Every candidate from Step 4 — KEEP, STRETCH and DROP: the measured gap, the segment's users over the range, users per arm, the arm count, the baseline per-user rate, `n·p`, the detectable relative effect (or `cannot be powered`), the verdict, and the reason. The context line states the constant, the confidence and power, and the unit |
 | **Hypotheses** | One row per KEEP or STRETCH test: name, IF, THEN, BECAUSE, evidence (tab + row/segment it traces to), pages, audience, primary metric, secondary metrics, expected MDE, its Step 4 verdict, the seven priority sub-scores, total, rank |
@@ -632,32 +632,51 @@ Rules for the build:
 - **Do not trim, round away, or top-N a tab to make it tidy.** Comprehensiveness is what the team
   asked to see.
 
-### The Funnel tab
+### The funnel tabs
 
-This tab answers one question — where does this funnel leak, and for whom — so everything on it is
-the funnel, read in funnel order. Five blocks, in this order, and nothing else:
+The funnel gets **one tab per table**, not one tab with five tables stacked down it:
 
-1. **The confirmed funnel**, the four-column table from 2c.
-2. **Whole-property drop-off**: step, active users, completion rate, abandonments, abandonment rate.
-3. **By device.**
-4. **By channel group.** Where the user asked for both groupings, the custom crosstab follows the
-   default one under its own label.
-5. **By landing page**, top 15.
+| Tab | Holds |
+|---|---|
+| **Funnel** | The confirmed funnel and its drop-off, as **one** table |
+| **Funnel x Device** | The device crosstab |
+| **Funnel x Channel (default)** | The default-grouping crosstab |
+| **Funnel x Channel (custom)** | The custom-grouping crosstab, where the user asked for both |
+| **Funnel x Landing page** | The landing-page crosstab, top 15 |
 
-**Blocks 3 to 5 are crosstabs, not stacks of little funnels.** Segments down the left, funnel steps
-across the top, active users where they intersect, with each step's completion rate in the column
-immediately right of the count it comes from — the same rule the Items tab uses, so a reader can
-follow one segment across the row:
+**Stacking them cost every one of them its column widths.** `fit_columns` sizes a column from the
+widest cell anywhere in that column *on the sheet*, so a `Page URL` in column C at 55 characters set
+the width of the `view_item` count in column C of every crosstab below it, and three tables were
+padded to the shape of the one table that needed the room. The rule that follows is general and
+applies to any tab, not just these: **one table per sheet.** Two tables that do not share a column
+meaning do not share a sheet.
+
+**The Funnel tab is one table, not two.** The confirmed funnel from 2c and the whole-property
+drop-off are the same five rows keyed by the same step — the shipped run printed
+`24,661 / 15,691 / 3,563 / 1,978 / 624` twice, once as `Users in range` and once as `Active users`.
+Join them:
 
 ```
-Funnel by channel  | view_item_list | view_item | % of view_item_list | add_to_cart | % of view_item | … | Overall
-All traffic        |        140,248 |    48,210 |               34.4% |      17,538 |          36.4% | … |    2.5%
-Organic Search     |         84,204 |    33,640 |               39.9% |       3,937 |          11.7% | … |    1.3%
-Direct             |         17,976 |     6,204 |               34.5% |       2,349 |          37.9% | … |    3.4%
+Step | Event          | Page URL          | Active users | Completion rate to next step | Abandonments | Abandonment rate
+1    | view_item_list | /collections/*    |       24,661 |                        63.6% |        8,970 |            36.4%
+2    | view_item      | /products/*       |       15,691 |                        22.7% |       12,128 |            77.3%
 ```
 
-**Every crosstab opens with an `All traffic` row**, bold, carrying the whole-property funnel from
-block 2. It is what makes the grid answer the question the team actually has, which is never "what
+#### The crosstabs
+
+Segments down the left, funnel steps across the top, active users where they intersect, with each
+step's completion rate in the column immediately right of the count it comes from — the same rule the
+Items tab uses, so a reader can follow one segment across the row:
+
+```
+Channel (default) | view_item_list | view_item | % of view_item_list | add_to_cart | % of view_item | … | Overall
+All traffic       |         24,661 |    15,691 |               63.6% |       3,563 |          22.7% | … |    2.5%
+Organic Search    |          7,081 |     4,778 |               67.5% |       1,104 |          23.1% | … |    3.1%
+Organic Social    |          3,845 |     1,675 |               43.6% |         232 |          13.9% | … |    1.1%
+```
+
+**Every crosstab opens with an `All traffic` row**, bold, carrying the whole-property funnel from the
+Funnel tab. It is what makes the grid answer the question the team actually has, which is never "what
 is Organic Search's add-to-cart rate" but "is Organic Search worse than everyone else at it". The
 rows below it are ordered by first-step users, descending.
 
@@ -675,8 +694,8 @@ Two properties of this shape worth knowing:
   scattered across seventy, and comparing two channels meant doing it twice and holding the first in
   your head. Sixteen landing pages took 81 rows; the same data is a 16-row grid.
 
-**No Tracking notes block.** Tracking observations go in the handover message (see
-[Deliver](#deliver)). This tab is for the experimentation team, and how the tags are wired is not
+**No Tracking notes block on any of them.** Tracking observations go in the handover message (see
+[Deliver](#deliver)). These tabs are for the experimentation team, and how the tags are wired is not
 what they are here to read.
 
 ### Column widths and context lines
@@ -806,7 +825,8 @@ head of it and its title says so.
 
 | Tab | Chart | Plotted against |
 |---|---|---|
-| Funnel | Four: (1) bar, active users per step, funnel order; then one grouped bar of step completion rate per crosstab — (2) by device, (3) by channel, (4) by landing page | Never sorted by size — the order *is* the finding. Charts 2 to 4 plot the *rate*, not the users, because that is what makes two segments of different size comparable. Series are the step transitions, categories are the segments, `All traffic` included as the leftmost category so every segment is read against it. Cap charts 3 and 4 at the top 8 segments and say so in the title; the crosstab keeps all of them |
+| Funnel | Bar, active users per step, in funnel order | Never sorted by size — the order *is* the finding |
+| Each `Funnel x …` tab | Grouped bar of step completion rate: series are the step transitions, categories are the segments | Plots the *rate*, not the users, because that is what makes two segments of different size comparable. `All traffic` is the leftmost category, so every segment is read against the baseline in the chart as well as the grid. Cap the channel and landing-page charts at the top 8 segments and say so in the title; the crosstab keeps all of them |
 | Landing pages, LP x Device, LP x Channel, Page types | Bar of sessions, top 15 rows, with conversion rate on a **secondary axis** | A rate against session counts is invisible on one axis |
 | Channel, Sources, Campaigns, Devices, Countries, New vs returning | Bar of sessions with conversion rate on a secondary axis, top 15 | |
 | Daily trend | Line, sessions and conversions by date, conversions on a secondary axis | |
@@ -879,6 +899,10 @@ def add_chart(ws, *, kind, header_row, first_row, last_row, cat_col, value_cols,
     primary.height, primary.width = 8.5, 17
     primary.roundedCorners = False
     primary.varyColors = False             # or a one-series bar gets a colour and a legend per point
+    # openpyxl writes no chartSpace fill at all, so the sheet shows through the chart. The header
+    # row's rule was landing across the top of every chart anchored level with it.
+    primary.graphical_properties = GraphicalProperties(
+        solidFill="FFFFFF", ln=LineProperties(solidFill=GRID, w=9525))
 
     cats = Reference(ws, min_col=cat_col, min_row=first_row, max_row=last_row)
     for col in value_cols:
@@ -925,7 +949,9 @@ def add_chart(ws, *, kind, header_row, first_row, last_row, cat_col, value_cols,
     else:
         primary.legend = None              # one series needs no legend, and Excel legends the points
 
-    ws.add_chart(primary, f"{get_column_letter(anchor_col)}{header_row}")
+    # Two rows below the header, not level with it: a chart whose top edge sits on the header row
+    # reads as though the rule under the column headers runs into it.
+    ws.add_chart(primary, f"{get_column_letter(anchor_col)}{header_row + 2}")
 ```
 
 **Long category labels get a `Chart label` column.** Excel truncates a rotated axis label to
@@ -938,8 +964,8 @@ form (`text if len(text) <= 24 else "..." + text[-21:]`, which keeps the tail, w
 differ), point `cat_col` at that column and anchor the chart two columns clear of *it*. Keep it out
 of the autofilter range: it is a chart aid, not data.
 
-The Funnel tab's landing-page chart needs one too, since its categories are landing pages. Its
-device and channel charts do not — those categories are short by nature. On all three, the **series**
+`Funnel x Landing page` needs one too, since its categories are landing pages. `Funnel x Device` and
+`Funnel x Channel` do not — those categories are short by nature. On all three, the **series**
 come from the crosstab's rate headers (`% of view_item_list`, `% of view_item`, …), which say which
 denominator each rate uses and are short enough for a legend as they stand.
 
@@ -995,7 +1021,8 @@ Fix and rebuild anything that fails; never deliver a workbook you have not reope
 just a tab that looks like the old workbook, and every fault the last round was reviewed for was
 silent. So for each chart, assert:
 
-- `len(ws._charts)` is 4 on Funnel, 1 on every tab the table above says gets one, and 0 on README,
+- `len(ws._charts)` is 1 on Funnel and on every `Funnel x …` tab, 1 on every tab the table above
+  says gets one, and 0 on README,
   Data completeness and Hypotheses.
 - **`x_axis.delete` and `y_axis.delete` are both `False`, not `None`** — `None` is the default and
   it means "no axis". If there is a secondary axis, check it too. This is the single check that
