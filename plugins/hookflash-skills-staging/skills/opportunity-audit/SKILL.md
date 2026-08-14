@@ -286,7 +286,7 @@ step-to-step drop-off.
 | Slice | What it can reveal |
 |---|---|
 | Step-to-step drop-off, whole funnel | Where the leak is |
-| Step-to-step drop-off by device and by channel group | Whose leak it is |
+| Step-to-step drop-off by device, by channel group, and by landing page | Whose leak it is |
 | Each funnel step × device category | Where the volume is vs where the conversion is |
 | Each funnel step × channel group | Which traffic gets how deep |
 | Landing page × sessions × conversions × conversion rate† | The pages worth testing at all |
@@ -308,15 +308,26 @@ for.** Pull the two counts — `sessions` (and `totalUsers`) with `keyEvents` �
 workbook. Asking for `sessionKeyEventRate` or `userKeyEventRate` directly costs you the de-sampling
 below, so the tab comes back an estimate for no gain.
 
-**Both broken-down drop-offs come from `run_ga4_funnel_report` with `breakdown_dimension` set** —
-`deviceCategory` for one, the chosen channel dimension for the other, `breakdown_limit` up to 15.
-Not from an event-count slice broken down by the same dimension. It looks like the same table and it
-is not: the funnel report counts users who reached step N *having passed through the steps before
-it*, so its per-step counts nest and its completion rates are real. Event counts do not nest — a
-channel whose users mostly skip the collection page and land straight on a PDP produces
-`view_item ÷ view_item_list` of **1,400%**, which is arithmetic, not a funnel. If a breakdown value
-the user cares about falls outside `breakdown_limit`, run the funnel again filtered to that value
-rather than reconstructing it from event counts.
+**All three broken-down drop-offs come from `run_ga4_funnel_report` with `breakdown_dimension`
+set** — `deviceCategory`, the chosen channel dimension, and `landingPagePlusQueryString` — never
+from an event-count slice broken down by the same dimension. It looks like the same table and it is
+not: the funnel report counts users who reached step N *having passed through the steps before it*,
+so its per-step counts nest and its completion rates are real. Event counts do not nest — a channel
+whose users mostly skip the collection page and land straight on a PDP produces
+`view_item ÷ view_item_list` of **1,400%**, which is arithmetic, not a funnel.
+
+Two limits on the breakdown, and one thing not to do about them:
+
+- **`breakdown_limit` maxes out at 15**, so the landing-page funnel is the top 15 landing pages and
+  its context line says so. That is the tab, not a truncation to apologise for; the `Landing pages`
+  tab carries every landing page at full depth for anything below the cut.
+- **If GA4 rejects `landingPagePlusQueryString` as a funnel breakdown, retry with `landingPage`**,
+  and if that also fails, leave the block out and say why in the Funnel tab's context line and at
+  handover. It is session-scoped where the funnel is user-scoped, so it may not be accepted on every
+  property.
+- **Do not reconstruct any of these from event counts when the funnel report will not give them to
+  you.** A missing block is a stated gap; a reconstructed one is a table of confident numbers that
+  are not completion rates.
 
 **Wherever a slice is broken down by channel, use the grouping the user chose in Step 1.** If they
 asked for both, that slice gets **two tabs** — one per grouping, each named for the grouping it
@@ -595,7 +606,7 @@ One `.xlsx`, built with openpyxl, in this tab order:
 |---|---|
 | **README** | Client and property name, GA4 property id, measurement id, date range, which channel grouping the audit reports on, the property totals for the range, and a one-line index of every tab. Nothing else — no data-source line, no funnel-type or starting-URL echo, no who-confirmed-it line, no derivation note, no generated timestamp. The reviewer knows how the workbook was made; the README is there to say what is in it |
 | **Data completeness** | One row per data tab, from the records kept in Step 3: rows in the tab, rows GA4 matched, truncated, sampled, % of data read, whether it was de-sampled and whether that came out exact (or why it was skipped), thresholded, `(other)` row present, and a notes column. Second tab deliberately — a caveat you have to scroll to is a caveat nobody reads |
-| **Funnel** | The confirmed funnel as the same four-column table the user confirmed in 2c (step, event, page URL, users), then the drop-off: whole property, then by device, then by channel group. Laid out as [The Funnel tab](#the-funnel-tab) describes. **No Tracking notes block and no landing-page breakdown** |
+| **Funnel** | The confirmed funnel as the same four-column table the user confirmed in 2c (step, event, page URL, users), then the drop-off: whole property, then a crosstab each by device, channel group and landing page. Laid out as [The Funnel tab](#the-funnel-tab) describes. **No Tracking notes block** |
 | **One tab per Step 3 slice** | The full table for that slice, named plainly (`Landing pages`, `LP x Device`, `LP x Channel`, `Sources`, `Campaigns`, `Devices`, `New vs returning`, `Countries`, `Daily trend`, `Events by day`, `Items`…). Where the user asked for both channel groupings, the two tabs say which is which (`Channel (default)`, `Channel (custom)`) |
 | **Opportunities** | Every candidate from Step 4 — KEEP, STRETCH and DROP: the measured gap, the segment's users over the range, users per arm, the arm count, the baseline per-user rate, `n·p`, the detectable relative effect (or `cannot be powered`), the verdict, and the reason. The context line states the constant, the confidence and power, and the unit |
 | **Hypotheses** | One row per KEEP or STRETCH test: name, IF, THEN, BECAUSE, evidence (tab + row/segment it traces to), pages, audience, primary metric, secondary metrics, expected MDE, its Step 4 verdict, the seven priority sub-scores, total, rank |
@@ -624,41 +635,49 @@ Rules for the build:
 ### The Funnel tab
 
 This tab answers one question — where does this funnel leak, and for whom — so everything on it is
-the funnel, read in funnel order. Four blocks, in this order, and nothing else:
+the funnel, read in funnel order. Five blocks, in this order, and nothing else:
 
 1. **The confirmed funnel**, the four-column table from 2c.
 2. **Whole-property drop-off**: step, active users, completion rate, abandonments, abandonment rate.
-3. **By device**, one block per device category.
-4. **By channel group**, one block per channel. Where the user asked for both groupings, the custom
-   blocks follow the default ones under their own heading.
+3. **By device.**
+4. **By channel group.** Where the user asked for both groupings, the custom crosstab follows the
+   default one under its own label.
+5. **By landing page**, top 15.
 
-**Blocks 3 and 4 are grouped by the breakdown value, not by the step.** Each device and each channel
-gets its own small heading and its own complete funnel underneath it, steps in funnel order, exactly
-like block 2:
+**Blocks 3 to 5 are crosstabs, not stacks of little funnels.** Segments down the left, funnel steps
+across the top, active users where they intersect, with each step's completion rate in the column
+immediately right of the count it comes from — the same rule the Items tab uses, so a reader can
+follow one segment across the row:
 
 ```
-Organic Search
-Step | Event            | Active users | Completion rate | Abandonments
-1    | view_item_list   |       84,204 |                 |
-2    | view_item        |       48,210 |           57.3% |       35,994
-3    | add_to_cart      |       17,538 |           36.4% |       30,672
+Funnel by channel  | view_item_list | view_item | % of view_item_list | add_to_cart | % of view_item | … | Overall
+All traffic        |        140,248 |    48,210 |               34.4% |      17,538 |          36.4% | … |    2.5%
+Organic Search     |         84,204 |    33,640 |               39.9% |       3,937 |          11.7% | … |    1.3%
+Direct             |         17,976 |     6,204 |               34.5% |       2,349 |          37.9% | … |    3.4%
 ```
 
-Then the next channel, then the next. **What this replaces is one long table of every
-(channel, step) pair sorted by user count**, which is what the first runs produced: reading one
-channel's funnel out of it means finding five rows scattered across seventy, and comparing two
-channels means doing that twice and holding it in your head. The team reads this tab a channel at a
-time, so the table is laid out a channel at a time. Order the blocks by the first step's users,
-descending, so the channels that matter are at the top.
+**Every crosstab opens with an `All traffic` row**, bold, carrying the whole-property funnel from
+block 2. It is what makes the grid answer the question the team actually has, which is never "what
+is Organic Search's add-to-cart rate" but "is Organic Search worse than everyone else at it". The
+rows below it are ordered by first-step users, descending.
 
-Two things not on this tab, both deliberate:
+**Last column is `Overall`** — final step ÷ first step — because that is the number people look for
+first and computing it across ten columns by eye is exactly what a table should save them.
 
-- **No landing-page breakdown.** A funnel per landing page is the same information the
-  `Landing pages` and `LP x Channel` tabs already carry at full depth, and it made this tab twice as
-  long as everything else on it put together.
-- **No Tracking notes block.** Tracking observations go in the handover message (see
-  [Deliver](#deliver)). This tab is for the experimentation team, and how the tags are wired is not
-  what they are here to read.
+Two properties of this shape worth knowing:
+
+- **It is also a check.** In a grid, a completion rate above 100% is impossible to miss, where the
+  same number buried in a list sorted by volume is not. **Any cell over 100% means the counts did
+  not come from `run_ga4_funnel_report`** — they are event counts, which do not nest. Fix the
+  source; do not ship the tab, and do not "fix" it by clamping the cell.
+- **It replaces one long table of every (segment, step) pair sorted by user count**, which is what
+  the shipped runs produced. Reading one channel's funnel out of that meant finding five rows
+  scattered across seventy, and comparing two channels meant doing it twice and holding the first in
+  your head. Sixteen landing pages took 81 rows; the same data is a 16-row grid.
+
+**No Tracking notes block.** Tracking observations go in the handover message (see
+[Deliver](#deliver)). This tab is for the experimentation team, and how the tags are wired is not
+what they are here to read.
 
 ### Column widths and context lines
 
@@ -787,7 +806,7 @@ head of it and its title says so.
 
 | Tab | Chart | Plotted against |
 |---|---|---|
-| Funnel | Three: (1) bar, active users per step, funnel order; (2) grouped bar, step completion rate by device; (3) grouped bar, step completion rate by channel, top 6 channels | Never sorted by size — the order *is* the finding. Charts 2 and 3 plot the *rate*, not the users, because that is what makes two segments of different size comparable |
+| Funnel | Four: (1) bar, active users per step, funnel order; then one grouped bar of step completion rate per crosstab — (2) by device, (3) by channel, (4) by landing page | Never sorted by size — the order *is* the finding. Charts 2 to 4 plot the *rate*, not the users, because that is what makes two segments of different size comparable. Series are the step transitions, categories are the segments, `All traffic` included as the leftmost category so every segment is read against it. Cap charts 3 and 4 at the top 8 segments and say so in the title; the crosstab keeps all of them |
 | Landing pages, LP x Device, LP x Channel, Page types | Bar of sessions, top 15 rows, with conversion rate on a **secondary axis** | A rate against session counts is invisible on one axis |
 | Channel, Sources, Campaigns, Devices, Countries, New vs returning | Bar of sessions with conversion rate on a secondary axis, top 15 | |
 | Daily trend | Line, sessions and conversions by date, conversions on a secondary axis | |
@@ -919,10 +938,10 @@ form (`text if len(text) <= 24 else "..." + text[-21:]`, which keeps the tail, w
 differ), point `cat_col` at that column and anchor the chart two columns clear of *it*. Keep it out
 of the autofilter range: it is a chart aid, not data.
 
-The two funnel comparison charts have the same problem and a neater answer than truncation: their
-categories are step transitions, and a completion rate belongs to the step it lands on, so **label
-them by the destination step alone** — `-> add_to_cart`, `-> begin_checkout`, `-> purchase`. Short,
-unambiguous, and no ellipsis. `add_to_cart -> begin_checkout` is 29 characters and comes back cut.
+The Funnel tab's landing-page chart needs one too, since its categories are landing pages. Its
+device and channel charts do not — those categories are short by nature. On all three, the **series**
+come from the crosstab's rate headers (`% of view_item_list`, `% of view_item`, …), which say which
+denominator each rate uses and are short enough for a legend as they stand.
 
 Six things that go wrong, in order of how easily they go unnoticed. The first three were all
 present in every chart of the first runs and are the reason those charts had no axes at all:
@@ -962,7 +981,9 @@ against the original tool responses, and confirm every evidence pointer on the H
 a tab that actually exists. **Recompute the MDE on at least two Opportunities rows from the inputs
 printed on that row** and confirm they match what you wrote — the formula is easy to apply to the
 wrong `p` — and confirm no row prints a detectable effect where `n·p < 10` or the result exceeds
-0.5. **Check the widths too** — for every sheet, assert that each column's
+0.5. **Assert that every completion-rate cell in every Funnel crosstab is ≤ 100%**: one that is not
+means that block was built from event counts rather than `run_ga4_funnel_report`, and the whole
+block is wrong rather than one cell. **Check the widths too** — for every sheet, assert that each column's
 width is at least the longest `display_len` in it (or that the column wraps and is at `MAX_W`), and
 that every context line is either unwrapped with no row height or merged with one — a wrapped
 banner with no height set is the crammed-cell bug. **Check the Data completeness tab has a row for
@@ -974,7 +995,7 @@ Fix and rebuild anything that fails; never deliver a workbook you have not reope
 just a tab that looks like the old workbook, and every fault the last round was reviewed for was
 silent. So for each chart, assert:
 
-- `len(ws._charts)` is 3 on Funnel, 1 on every tab the table above says gets one, and 0 on README,
+- `len(ws._charts)` is 4 on Funnel, 1 on every tab the table above says gets one, and 0 on README,
   Data completeness and Hypotheses.
 - **`x_axis.delete` and `y_axis.delete` are both `False`, not `None`** — `None` is the default and
   it means "no axis". If there is a secondary axis, check it too. This is the single check that
