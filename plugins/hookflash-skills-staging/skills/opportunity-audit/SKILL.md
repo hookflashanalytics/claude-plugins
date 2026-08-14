@@ -865,13 +865,15 @@ guess what they are looking at, and the numbers on this workbook are the whole p
 import openpyxl
 from openpyxl.chart import BarChart, LineChart, Reference
 from openpyxl.chart.axis import ChartLines
+from openpyxl.chart.data_source import StrRef
+from openpyxl.chart.series import SeriesLabel
 from openpyxl.chart.shapes import GraphicalProperties
 from openpyxl.chart.text import RichText
 from openpyxl.drawing.line import LineProperties
 from openpyxl.drawing.text import (
     CharacterProperties, Font as DrawFont, Paragraph, ParagraphProperties, RichTextProperties,
 )
-from openpyxl.utils import get_column_letter
+from openpyxl.utils import get_column_letter, quote_sheetname
 
 TAPA_BLUE, TAPA_INK, GRID, INK = "2F6BED", "9AA5B1", "E2E1E0", "26241F"
 AXIS_TEXT = "595959"
@@ -904,6 +906,22 @@ def _style_axis(axis, *, title, number_format=None, gridlines=False, rotation=No
         spPr=GraphicalProperties(ln=LineProperties(solidFill=GRID, w=9525))) if gridlines else None
 
 
+def _add_series(chart, ws, col, header_row, first_row, last_row):
+    """Values from first_row down; the series NAME fetched separately from the header.
+
+    `add_data(..., titles_from_data=True)` needs one contiguous range starting at the header,
+    so it silently swallows anything sitting between the header and the first data row — a
+    TOTAL row, a section label, a blank spacer. That is not merely an extra point: the
+    categories start at first_row, so values and categories end up off by one and EVERY point
+    on the chart is attributed to the wrong row. Fetching the name by reference decouples the
+    two and lets the values start wherever the data actually starts.
+    """
+    chart.add_data(Reference(ws, min_col=col, min_row=first_row, max_row=last_row),
+                   titles_from_data=False)
+    chart.series[-1].tx = SeriesLabel(
+        strRef=StrRef(f"{quote_sheetname(ws.title)}!{get_column_letter(col)}{header_row}"))
+
+
 def add_chart(ws, *, kind, header_row, first_row, last_row, cat_col, value_cols,
               title, x_title, y_title, anchor_col, secondary=(), y2_title=None,
               y_format="#,##0", y2_format="0.0%", rotate_labels=True):
@@ -928,8 +946,7 @@ def add_chart(ws, *, kind, header_row, first_row, last_row, cat_col, value_cols,
 
     cats = Reference(ws, min_col=cat_col, min_row=first_row, max_row=last_row)
     for col in value_cols:
-        primary.add_data(Reference(ws, min_col=col, min_row=header_row, max_row=last_row),
-                         titles_from_data=True)
+        _add_series(primary, ws, col, header_row, first_row, last_row)
     primary.set_categories(cats)
     n_series = len(primary.series)
     multi = n_series > 1
@@ -951,8 +968,7 @@ def add_chart(ws, *, kind, header_row, first_row, last_row, cat_col, value_cols,
     if secondary:
         right = LineChart()
         for col in secondary:
-            right.add_data(Reference(ws, min_col=col, min_row=header_row, max_row=last_row),
-                           titles_from_data=True)
+            _add_series(right, ws, col, header_row, first_row, last_row)
         right.set_categories(cats)
         for s in right.series:
             s.graphicalProperties.line.solidFill = TAPA_INK
@@ -1017,6 +1033,15 @@ present in every chart of the first runs and are the reason those charts had no 
   chart is 1 and a naive "hide the legend when there is one series" test strips the legend from
   exactly the charts that need one — the reader can no longer tell the bars from the line. Count
   before the merge, which is what `n_series` above is for.
+- **`first_row` is the first row of DATA, never a total row.** `Events by day` carries a `TOTAL`
+  row directly under its header and `Items` carries the property total as its first row, and both
+  are one row below the header, which is exactly where a naive `first_row = header_row + 1` lands.
+  The shipped run charted the total: `view_item` at 313,754 against daily values around 9,000, so
+  every real series was flattened onto the axis and the tab looked like a single spike on day one.
+  **A total belongs in a chart only when it is on the same scale as the rows it summarises** — the
+  `All traffic` baseline on the funnel crosstabs is a *rate*, comparable to every other rate there,
+  and is charted deliberately. A *sum* never is. Pass `first_row` as the row below the total, and
+  let `_add_series` keep the legend name.
 - **Plot from the sorted table, cap the categories, and never chart a `cannot be powered` row.** A
   bar chart with 400 categories is a grey smear, so take the head of the already-ordered table and
   put the cap in the title (`top 15 of 412 landing pages`) so nobody reads it as the whole picture.
