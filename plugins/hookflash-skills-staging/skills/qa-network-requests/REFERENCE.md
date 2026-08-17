@@ -205,10 +205,11 @@ authoritative list.
   Renders as **Spec parameters**, with values pulled out of `payload` by the script (see below).
 - `spec_payload`: optional explicit dict, overrides `spec_params`. Only for mappings that are not
   a lookup.
-- `conditions`: what you did to trigger it.
+- `conditions`: one phrase for what you did, <= 90 chars, no sentence (`Clicked 'Add to bag', PDP`).
 - `location_image`: filename inside the screenshots dir. Prefer a tight crop saved via the
   `computer` `zoom` action.
-- `verdict`: `pass` | `fail` | `warn` | `na`. `notes`: list of `"- ..."` bullets, no em/en dashes.
+- `verdict`: `pass` | `fail` | `warn` | `na`. `notes`: list of `"- ..."` bullets, <= 5 bullets and
+  <= 120 chars each, observation only, no em/en dashes. See SKILL.md "Writing style".
 - `count`: optional integer, how many identical hits fired for the one interaction. Rendered
   when > 1, so duplicate tagging is visible.
 
@@ -246,11 +247,11 @@ A list, one object per vendor, plus optionally one state object first.
 - `reset`: optional sentence describing what the reset actually cleared, e.g.
   `"Cleared 14 cookies and 22 localStorage keys, then reloaded."` Appended to the banner line.
 - `vendor`: vendor name.
-- `before`: what was observed before consent, e.g. `"1 hit (page_view)"` or `"No hits observed"`.
+- `before`: a count plus event names, e.g. `"1 hit (page_view)"` or `"No hits observed"`.
 - `signal`: the consent signal on those hits, e.g. `"gcs=G100 (ad_storage denied, analytics_storage denied)"`, or `"n/a (no consent parameter)"`.
-- `after`: what was observed after granting consent.
-- `observation`: one or two plain descriptive sentences. **Describe, do not grade.** No verdict
-  field exists on this tab by design.
+- `after`: same shape, after granting consent.
+- `observation`: one or two clauses, <= 160 chars. **Describe, do not grade.** No verdict field
+  exists on this tab by design.
 - `location_image`: optional, normally the cookie banner screenshot.
 
 ## Workbook layout
@@ -265,5 +266,13 @@ Full payload | Spec parameters | Location screenshot | Pass / Fail.
 There is no Vendor column on the platform tabs; the tab name is the vendor. Tab names are
 sanitised for Excel (31 chars, no `: \ / ? * [ ]`, deduplicated) and tinted per vendor.
 
-Rows auto-size to fit. Keep the output filename short (~12 chars max, generic): deep session
-paths hit the Windows 259-char limit and the workbook will not open.
+Columns are deliberately wide and rows auto-size to fit, because row height is what makes this
+workbook unreadable: a tall row hides the next event. Two things keep rows short, and both are
+`build_report.py`'s job, not yours: the Full payload cell packs scalar params two per line
+(values untouched, nested values keep their JSON block), and the row-height maths models how
+Excel actually wraps, including its breaks at hyphens. **Your** job is the third thing: keep
+`conditions`, `notes` and `observation` terse (SKILL.md "Writing style"). The run prints any
+cell that overruns its budget.
+
+Keep the output filename short (~12 chars max, generic): deep session paths hit the Windows
+259-char limit and the workbook will not open.

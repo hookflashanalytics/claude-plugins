@@ -37,6 +37,7 @@ If they genuinely have no spec, say plainly that this becomes a description of w
 - **Escape every payload you return, or you will get blank results.** The browser tool blanks any result containing `?`, `=` or `&`, and every tag hit is one long query string, so this bites on literally every read. Always return through `window.__dump(...)` (see "The output filter"). This is the single most common way a run stalls.
 - **Never paste hashed or raw user data into the report.** Advanced-matching params (Meta `ud[em]` / `ud[ph]`, GA4 user-provided data, UET `em`) carry hashed emails and phone numbers. Record that the param was **present** and its length, never its value. Same for `cid` / `_ga` client IDs: note presence, truncate to the first few characters.
 - **Consent is reported, never graded.** See "Consent check". Describe what the tags did; do not tell the user it is wrong.
+- **Write for an analyst: observation only, in fragments.** The cells you fill in (conditions, verdict bullets, consent observation) are terse notes for someone who already knows these vendors, never explanations of the concepts. See "Writing style".
 - **No em dashes or en dashes anywhere in the report text.** Use commas, parentheses, or hyphens. (`build_report.py` also strips them from prose cells as a safety net.)
 - **Do not screenshot any debug overlay, tag assistant or pixel helper.** Screenshots must show the real page, and for interactions a tight crop of the element interacted with.
 - **Output filename must be tiny.** The session output directory is already ~200 characters; a long descriptive filename blows past the Windows 259-char path limit and the workbook will not open. See "Output filename".
@@ -50,7 +51,7 @@ If they genuinely have no spec, say plainly that this becomes a description of w
 5. **Hide dev overlays** so they never leak into a screenshot (tag assistant panels, Shopify's `web-pixels-helper-sandbox-container`, CMP debug badges). Re-hide after each navigation.
 6. **Discovery pass: learn what this site actually sends.** Install `scripts/net_hook.js` and run `window.__nqaAll()` after a page load and one interaction. It returns every outgoing request the vendor matcher recognises **plus** an `unclassified` list of other third-party requests. Read the unclassified list: that is where a vendor the matcher does not know, or a first-party server-side endpoint, shows up. Add anything real to the audit. See REFERENCE "Vendor endpoints and payload shapes".
 7. Walk the funnel, **marking before each trigger and reading after** (see "Attributing a hit to an interaction"): PLP load -> click a product -> PDP (and change variant to re-fire) -> add to cart from the PDP **and** from the mini-bag/drawer, including any upsell/bundle add -> open cart/mini-bag -> remove via **every** control (quantity-decrement, trash/remove, add-on remove) on both cart page and mini-bag -> checkout -> shipping -> payment (**stop before paying**). Adjust to the spec's event list and to a non-ecommerce funnel (forms, sign-ups, calls) where that is what the spec describes.
-8. For each hit record: `event`, `vendor` (this decides which tab it lands on), the request (method + endpoint), the verbatim URL, the full decoded payload, **`spec_params`** (see "The two payload columns"), a **tight location screenshot**, and a bulleted verdict audited against the spec.
+8. For each hit record: `event`, `vendor` (this decides which tab it lands on), the request (method + endpoint), the verbatim URL, the full decoded payload, **`spec_params`** (see "The two payload columns"), a **tight location screenshot**, a one-phrase `conditions` (e.g. `Clicked 'Add to bag', PDP`), and a terse bulleted verdict audited against the spec (see "Writing style").
 9. **A spec'd event that sends nothing is a finding, and one of the most valuable ones, which is exactly why it has to be proved.** Record it with `vendor` from the spec, `sent: false`, verdict `fail`, and a mandatory `absence_evidence` string. See "Claiming something did not fire" before writing any of those.
 10. Build the report: write `events.json` and `consent.json` (schemas in REFERENCE) and run `python scripts/build_report.py events.json consent.json <screenshots_dir> <out.xlsx>`.
 11. **Verify**: reopen the workbook and confirm the tab list is Consent followed by one tab per platform, that every row has a request, a full payload, a spec-parameter cell and a readable screenshot, and that nothing clips. Say in chat which vendors and events you covered and which you could not.
@@ -134,7 +135,7 @@ For each vendor in the spec, record: did **any** hit go out, and if so what cons
 
 **Step 4: grant consent** (click Accept all, or whatever the spec's scenario is), then read again with a fresh mark. Note which vendors started sending, and whether the consent signal changed. Screenshot the banner for the Consent tab while it is still on screen.
 
-**Step 5: write it up descriptively**, one row per vendor on the Consent tab. Report, do not prescribe:
+**Step 5: write it up descriptively**, one row per vendor on the Consent tab. Report, do not prescribe. Keep the cells short: `before` and `after` are a count plus the event names (`1 hit (page_view)`), `signal` is the raw value plus its decode, `observation` is one or two clauses. The patterns below are for **you** to recognise, not text to copy into the cell:
 
 - **No hits at all before consent, hits after** - basic consent mode, or the tag is simply gated on consent. Describe it as observed.
 - **GA4 hits before consent carrying `gcs=G100`** - advanced consent mode: the hit is a cookieless ping with `ad_storage` and `analytics_storage` both denied. This is a normal, deliberate configuration. Report it as advanced consent mode, **not** as a failure.
@@ -244,21 +245,31 @@ Work param by param, in the spec's own terms:
 
 **Cart-event semantics.** `add_to_cart` and `remove_from_cart` describe **what moved**, not the resulting cart: quantity is the units added or removed in that interaction and value is `price * quantity` for those items alone, so adding one unit to a cart that already holds two is `qt1` and value `1 x price`, never `qt3`. Whole-cart events (`view_cart`, `begin_checkout`, `add_shipping_info`, `add_payment_info`, `purchase`) are the opposite: every line, value equal to the cart total. This is the most common misjudgement in tracking QA, in both directions.
 
-## Writing the verdict (Pass / Fail column)
+## Writing style: observation only, written for an analyst
 
-Keep this column tight and skimmable, it is read at a glance:
+**Every cell you write yourself is an observation, not an explanation.** The reader is an analytics engineer or CRO analyst who already knows what `gcs`, `epn.value` and a pixel ID are. They want to know what fired, when, and with what. Explaining the concept, restating the spec, or reasoning out loud in a cell is noise, and it is also what makes the rows tall.
 
-- **One short bullet per real finding.** Lead with a single "Matches spec" line when the hit is clean, then list only the problems.
-- **Only flag what is actually wrong or risky.** Do not narrate non-issues: standard vendor params absent but not in the spec, transport params (`_p`, `_s`, `sr`, `ul`, `_et`) that the spec never mentions, or values that are legitimately empty at that funnel stage.
-- **Say what is wrong in plain language**, and name the param once so it is searchable: "Value is the cart total, not the item added (`epn.value`)".
-- `build_report.py` renders a blank line between bullets automatically, so keep each finding as its own bullet, never one congealed block of prose.
+This applies to the three cells the model fills: **Conditions tested**, **Pass / Fail**, and the Consent tab's **Observation**. It does **not** apply to the evidence cells (verbatim URL, body, full payload, absence evidence), which stay complete and untouched.
+
+- **Fragments, not sentences.** Drop "The", "This", "It appears that", "was observed to". `Clicked 'Add to bag', PDP` beats `Clicked the "Add to bag" button on the product detail page to trigger the event.`
+- **One line per fact, max five bullets per hit.** If there are more than five findings, the hit is broken and the top five say so.
+- **Name the param, state the deviation, stop.** No "which means", no "this will cause", no advice on how to fix it.
+- **No restating the spec** and no repeating a value that is already visible in the Spec parameters cell.
+- **Only flag what is wrong or risky.** Never narrate non-issues: transport params (`_p`, `_s`, `sr`, `ul`, `_et`) the spec does not mention, vendor params absent but not spec'd, or values legitimately empty at that funnel stage.
+- One clean line is enough for a passing hit: `- Matches spec`.
+
+`build_report.py` puts a blank line between bullets, and prints a warning at the end of the run naming any cell that has run long (budgets: conditions 90 chars, verdict bullets 120 chars each and 5 max, observation 160 chars). Treat that warning as work to do, not as advice.
 
 Example (`add_to_cart`, Meta), this is the whole cell:
 
-- Matches spec on event name, pixel ID and content_ids
-- cd[value] is 118.00, the cart total, where the spec asks for the value of the item added (29.99)
-- cd[currency] is missing, so Meta will fall back to the pixel default
-- Hit fired twice on one click, once from GTM and once from a hardcoded snippet
+- Matches spec: event name, pixel ID, content_ids
+- cd[value] 118.00 = cart total, spec wants item added (29.99)
+- cd[currency] absent
+- Fired 2x on one click (GTM + hardcoded snippet)
+
+The same hit written the wrong way, for contrast, and this is roughly what the row height cost is:
+
+> The hit matches the spec on the event name, the pixel ID and the content_ids array. However, `cd[value]` arrived as 118.00, which is the total value of the cart at that moment, whereas the spec requires the value of the item that was added to the cart, which would have been 29.99. In addition, `cd[currency]` is missing from the hit, which means Meta will fall back to the default currency configured on the pixel and could misattribute revenue.
 
 ## Location screenshots (show the trigger)
 
