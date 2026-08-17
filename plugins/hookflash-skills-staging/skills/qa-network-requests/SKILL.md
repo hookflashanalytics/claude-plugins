@@ -23,8 +23,25 @@ If the tags have not been built yet there will be no hits to read, and the user 
 
 1. **Test URL** - page/store to start from (staging/preview is fine; any theme/preview params must survive redirects).
 2. **The spec (required, any format).** Ask for whatever they have: a dataLayer document, an event design or measurement plan, a tagging spec, a Google Sheet, a Doc, a Notion page, a deck, a GTM export, or just a list of events in the chat. **Do not assume a PowerPoint.** Read it before touching the browser and restate, in two or three lines, which vendors and which events you are about to check, so a misread spec is caught before the walk, not after.
-3. **Which vendors** - default to every vendor the spec names, plus anything the discovery pass finds that the spec does not mention (an undocumented vendor firing is itself a finding). Ask if they want a subset.
+3. **Which platforms.** If the user named the platforms, or the spec names them, use those and do not ask. **If nobody has said which platforms to QA, ask before opening the browser** (the question is below). Whatever the answer, it is a floor and not a ceiling: anything the discovery pass finds that nobody mentioned still goes in the report, because an undocumented vendor firing is itself a finding.
 4. **Which events** - default to everything in the spec. Skip `purchase` / conversion hits unless asked (never complete a real payment).
+
+### The platform question (ask only when no platform is known)
+
+`AskUserQuestion` allows a maximum of **four options per question**, so the six platforms do not fit in one list. Ask **two multi-select questions in a single call**, which the user sees as one prompt, and never split them across two calls:
+
+| | Question 1 | Question 2 |
+|---|---|---|
+| `header` | `Platforms 1/2` | `Platforms 2/2` |
+| `question` | "Which platforms should I QA? (1 of 2)" | "And any of these? (2 of 2)" |
+| `multiSelect` | `true` | `true` |
+| `options` | GA4, Google Ads, Meta, TikTok | Pinterest, Bing (Microsoft UET) |
+
+Do **not** add an "Other" option yourself: `AskUserQuestion` appends one automatically, and it is the free-text box for anything not listed (Floodlight, LinkedIn, Snapchat, Segment, an affiliate network, a first-party server-side endpoint). Read a free-text answer as a list, so "Snapchat and Awin" is two vendors, and spell each one consistently in `vendor` from then on, because that field is what creates the tabs.
+
+Selecting nothing in question 2 is a normal answer, not a failure to answer. If the user selects nothing at all in either, treat it as "everything the discovery pass finds" and say so.
+
+The option label is not the tab name: record `vendor` as the short canonical name (`GA4`, `Google Ads`, `Meta`, `TikTok`, `Pinterest`, `Microsoft UET`), which is what gets tinted and what keeps one platform to one tab.
 
 If they genuinely have no spec, say plainly that this becomes a description of what the site sends rather than an audit, offer the standard GA4 ecommerce expectations in [REFERENCE.md](REFERENCE.md) as the fallback yardstick, and label every verdict accordingly.
 
@@ -44,7 +61,7 @@ If they genuinely have no spec, say plainly that this becomes a description of w
 
 ## Workflow
 
-1. Read the spec and restate the vendors and events you are checking (input 2 above).
+1. Read the spec and restate the vendors and events you are checking (input 2 above). If no platform is known by this point, ask the platform question first (input 3).
 2. Open a **fresh tab** and navigate to the test URL.
 3. **Do the consent check now, before anything else.** It clears cookies, so running it later would empty the cart and log you out mid-walk. See "Consent check".
 4. **Lock the viewport.** Call `resize_window` to **1280 x 900** before capturing anything. Screenshot pixels stay ~1:1 with CSS pixels, so `getBoundingClientRect()` values work directly as crop regions, and coordinates stay reproducible. Do not resize again mid-run.

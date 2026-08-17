@@ -113,9 +113,16 @@ FILLS = {"pass": PatternFill("solid", fgColor="D6EAD6"),
          "fail": PatternFill("solid", fgColor="F7D6D6"),
          "warn": PatternFill("solid", fgColor="FCEFC7"),
          "na":   PatternFill("solid", fgColor="E6E6E6")}
+# Keyed on the lowercased `vendor` value. Several spellings map to one colour on
+# purpose: the platform question offers "Bing (Microsoft UET)" and "Meta", and a
+# vendor that arrives spelled the way the user picked it should still be tinted.
 VENDOR_FILLS = {"ga4": "DCE7F5", "meta": "D9E3F7", "facebook": "D9E3F7",
-                "tiktok": "EADCF5", "google ads": "FBE3D6", "floodlight": "FBE3D6",
-                "microsoft uet": "DCF0EE", "pinterest": "F7D9DE",
+                "meta (facebook)": "D9E3F7",
+                "tiktok": "EADCF5", "tik tok": "EADCF5",
+                "google ads": "FBE3D6", "floodlight": "FBE3D6",
+                "microsoft uet": "DCF0EE", "bing": "DCF0EE", "uet": "DCF0EE",
+                "bing (microsoft uet)": "DCF0EE", "microsoft uet (bing)": "DCF0EE",
+                "pinterest": "F7D9DE",
                 "linkedin": "D9E9F7", "snapchat": "FCF4C7", "segment": "E4EEDC"}
 THIN = Side(style="thin", color="BBBBBB")
 BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
