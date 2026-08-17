@@ -89,6 +89,8 @@ Common patterns and how to capture each:
 
 This QA validates what the site pushes into its dataLayer (or equivalent JS layer), which is normally implemented BEFORE the GTM/GA4 tags that forward it. At that stage there are usually no analytics network beacons firing at all, so do not try to QA network requests (`/collect`, `/tr`, etc.), they would be empty or misleading. The captured JS push is the sole source of truth.
 
+When the tags DO exist and the question is whether the data reached the vendors, that is `/qa-network-requests`, not this skill.
+
 ## Capturing an element's box (for tight location shots)
 
 ```js

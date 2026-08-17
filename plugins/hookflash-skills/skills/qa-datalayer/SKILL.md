@@ -11,6 +11,8 @@ Drive the user's connected Chrome, walk an ecommerce funnel, capture each event'
 
 **Scope: the dataLayer / push layer only.** This skill QAs the data the site pushes into its `dataLayer` (or equivalent JS layer), typically after the dataLayer is implemented but BEFORE the GTM/GA4 tags that forward it are built. So there are usually no GA4 or vendor network beacons to read yet, and QAing network requests is out of scope. The source of truth is always the JS push captured in the browser, never a network request.
 
+**Once the tags are built, that job belongs to `/qa-network-requests`**, which reads the outgoing hits and their payloads instead. If the user wants both, run this one first: a push that looks perfect here can still arrive at the vendor mangled by the tag mapping.
+
 ## Gather inputs first (use AskUserQuestion)
 
 1. **Test URL** - page/store to start from (staging/preview is fine; any theme/preview params must survive redirects).
