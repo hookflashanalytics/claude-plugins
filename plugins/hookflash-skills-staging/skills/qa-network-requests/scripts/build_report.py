@@ -46,10 +46,14 @@ tab it lands on, so it is required:
         # coming back empty is not evidence that nothing was sent.
 
   "count": 2,                              # optional; rendered when > 1 (duplicate tagging)
-  "conditions": "Clicked the 'Shop' nav link in the header.",
+  "conditions": "Clicked 'Shop' nav link, header",
+        # One short phrase. What was done, not why, not what it proves.
   "location_image": "nav_shop.png",        # filename inside screenshots_dir
   "verdict": "fail",                       # pass | fail | warn | na
-  "notes": ["- Matches spec on event name", "- ep.link_url absent"]
+  "notes": ["- Event name, tid match spec", "- ep.link_url absent"]
+        # Terse bullets, observation only, max 5. The reader is an analyst who
+        # knows GA4/Meta/TikTok: name the param and what is wrong with it, and
+        # stop. No explanations of what a param is for or why it matters.
 }
 
 consent.json = list of objects, one per vendor, optionally preceded by a state object:
@@ -61,12 +65,19 @@ consent.json = list of objects, one per vendor, optionally preceded by a state o
         # REQUIRED when "before" claims nothing fired, same gate as absence_evidence.
   "signal": "n/a (no consent parameter)",
   "after": "1 hit (PageView)",
-  "observation": "No Meta requests were observed before consent was granted.",
+  "observation": "Gated on consent. First /tr hit is PageView, post-accept.",
+        # One or two clauses, descriptive, never a verdict.
   "location_image": "banner.png"
 }
 
 Design rules baked in here:
-- "url", "body" and "payload" are rendered VERBATIM. Never pre-format or tidy them.
+- Columns are WIDE and prose cells are SHORT, because row height is what makes this
+  workbook unreadable. Cells you write ("conditions", "notes", "observation") are
+  observations for an analyst, not explanations: overrunning the MAX_* budgets below
+  is reported at the end of the run. Evidence cells have no budget and are never cut.
+- "url" and "body" are rendered VERBATIM, character for character. Never pre-format,
+  trim or tidy them. Payload VALUES are equally verbatim; only their layout is ours
+  (params are packed two per line to keep the row short, see payload_text).
 - "Spec parameters" is DERIVED from "payload" by this script, not retyped, so it
   cannot drift from the evidence beside it.
 - The Consent tab has NO pass/fail column, deliberately, and comes first. Consent
@@ -115,29 +126,102 @@ IMG_PAD_PT = 14
 
 # Per-platform tab: A event, B conditions, C request, D full payload,
 #                   E spec params, F screenshot, G verdict
-EVENT_COLS = {"A": 18, "B": 26, "C": 40, "D": 42, "E": 32, "F": 54, "G": 40}
+#
+# Columns are WIDE on purpose. The tall content here is a verbatim hit URL and a
+# JSON payload, both of which wrap; a narrow column turns one hit into a 40-line
+# row and the reader scrolls vertically through a single event. Trading horizontal
+# scroll (cheap, one gesture) for row height (expensive, hides the next event) is
+# the right way round. Widen these before shortening any evidence cell.
+EVENT_COLS = {"A": 20, "B": 34, "C": 76, "D": 64, "E": 44, "F": 54, "G": 52}
 EVENT_HEADERS = ["Event name", "Conditions tested", "Request (verbatim)",
                  "Full payload", "Spec parameters", "Location screenshot", "Pass / Fail"]
-CONSENT_COLS = {"A": 16, "B": 26, "C": 34, "D": 26, "E": 52, "F": 54}
+CONSENT_COLS = {"A": 18, "B": 34, "C": 40, "D": 34, "E": 60, "F": 54}
 CONSENT_HEADERS = ["Vendor", "Before consent", "Consent signal", "After consent",
                    "Observation (not a verdict)", "Screenshot"]
+
+# Prose-cell budgets. The audience is analysts who know the vendors and the
+# concepts, so these cells are observations, not explanations. Exceeding a budget
+# is not fatal (evidence is never truncated), but it is printed at the end of the
+# run so an over-written report gets tightened instead of shipped.
+MAX_CONDITION = 90          # chars, one line: what was done, not why
+MAX_NOTE = 120              # chars per verdict bullet
+MAX_NOTES = 5               # bullets per hit
+MAX_OBSERVATION = 160       # chars, the Consent tab's observation cell
+
+
+CHAR_UNITS = 9.5        # see chars_per_line: calibrated, not derived
+
+
+def chars_per_line(col_width, font_size):
+    """How many characters fit on one line of a column of col_width at font_size.
+
+    Excel's width unit is ~1 character of the workbook default font (Calibri 11),
+    so a column's capacity in some other font scales by that font's size. The
+    9.5 is measured, not derived: an earlier 11.0 overestimated capacity by ~15%,
+    every row came out ~2 lines too short, and the tail of each verbatim hit URL
+    was clipped where nobody would notice it was missing. If you change a font
+    size or a column width, re-export a sheet and check the LAST characters of a
+    long URL are still on screen. Everything that needs a column's capacity asks
+    this, so the row-height maths and the payload layout cannot drift apart.
+    """
+    return max(8, int(col_width * CHAR_UNITS / max(font_size, 1)))
+
+
+def break_pieces(line):
+    """Split a logical line where Excel is allowed to wrap it.
+
+    Excel breaks after a space and after a hyphen, and splits mid-token only when
+    a token cannot fit a line at all. That matters here because a hit URL is full
+    of hyphens (`tid=G-X50M0R6F70`, `en-us`, `tag_exp=115616985~...-118897920`),
+    so it wraps ragged: several lines end early at a hyphen, and the URL needs
+    more lines than its length divided by the column capacity.
+    """
+    out, cur = [], ""
+    for ch in line:
+        cur += ch
+        if ch in " -":
+            out.append(cur)
+            cur = ""
+    if cur:
+        out.append(cur)
+    return out
+
+
+def wrapped_lines(text, chars):
+    """How many display lines `text` occupies in a column `chars` wide.
+
+    Counting "\\n" alone under-counts badly: one verbatim hit URL is a single
+    logical line that wraps to seventeen. Counting len/chars under-counts too,
+    because of the ragged breaks described in break_pieces, and an under-counted
+    row silently clips the TAIL of the URL, which is exactly where the event
+    params live. So pack the break pieces the way Excel does.
+    """
+    total = 0
+    for logical in str(text).split("\n"):
+        lines, used = 1, 0
+        for p in break_pieces(logical):
+            if len(p) > chars:                      # too long to fit any line
+                if used:
+                    lines += 1
+                lines += -(-len(p) // chars) - 1    # ceil, minus the line we are on
+                used = len(p) % chars or chars
+            elif used + len(p) <= chars:
+                used += len(p)
+            else:
+                lines += 1
+                used = len(p)
+        total += lines
+    return total
 
 
 def cell_height(text, col_width, font_size):
     """Points needed to show `text` wrapped in a column of col_width at font_size.
 
-    Counting "\\n" alone under-counts badly here: a single verbatim hit URL is one
-    logical line but wraps to five, and a row sized off the newline count clips it.
-    Excel's width unit is ~1 char of the default 11pt font, so scale by font size.
-    Derive line height from the font size too, so the two cannot drift apart.
+    Line height comes off the font size too, so the two cannot drift apart.
     """
     if not text:
         return LINE_PT * font_size
-    chars = max(8, int(col_width * 11.0 / max(font_size, 1)))
-    n = 0
-    for line in str(text).split("\n"):
-        n += max(1, -(-len(line) // chars))     # ceil division
-    return n * font_size * LINE_PT
+    return wrapped_lines(text, chars_per_line(col_width, font_size)) * font_size * LINE_PT
 
 
 def row_height(cells, img_px=0, floor=0):
@@ -175,6 +259,51 @@ def place_image(ws, row, col_letter, shots_dir, img_file):
     img.height = int(IMG_W * h0 / w0)
     ws.add_image(img, "%s%d" % (col_letter, row))
     return img.height
+
+
+# ---------------------------------------------------------------- payload cell
+
+SCALAR = (str, int, float, bool, type(None))
+
+
+def payload_text(payload, col_width, font_size):
+    """The Full payload cell: every param, values verbatim, laid out to be short.
+
+    One param per line is what actually makes these rows taller than the screen:
+    a GA4 hit carries 40+ params, so a JSON dump is a 45-line cell no column
+    width can shrink. Scalar params are therefore packed two per line when both
+    halves fit, which roughly halves the tallest cell in most rows. The payload
+    font is monospace, so the two columns line up.
+
+    Nothing is altered: no value is truncated, reordered or reformatted, only
+    padded with spaces. Values go through json.dumps so the string "2" still
+    reads differently from the number 2, which is itself a finding in this QA
+    (`ep.value` vs `epn.value`). Nested values (GA4 items, a JSON body) keep a
+    full-width JSON block, because their structure is the readable part.
+    """
+    if not isinstance(payload, dict):
+        return json.dumps(payload, indent=2, ensure_ascii=False)
+
+    flat, nested = [], []
+    for k, v in payload.items():
+        if isinstance(v, SCALAR):
+            flat.append("%s: %s" % (k, json.dumps(v, ensure_ascii=False)))
+        else:
+            nested.append('%s: %s' % (k, json.dumps(v, indent=2, ensure_ascii=False)))
+
+    half = (chars_per_line(col_width, font_size) - 2) // 2
+    lines, i = [], 0
+    while i < len(flat):
+        a = flat[i]
+        b = flat[i + 1] if i + 1 < len(flat) else None
+        if b is not None and len(a) <= half and len(b) <= half:
+            lines.append(a.ljust(half + 2) + b)
+            i += 2
+        else:
+            lines.append(a)
+            i += 1
+    # An empty dict is not the same as no payload: say so rather than render blank.
+    return "\n".join(lines + nested) or "(payload decoded to no params)"
 
 
 # ---------------------------------------------------------------- spec params
@@ -231,6 +360,32 @@ def spec_view(ev):
     return {p: lookup(ev.get("payload"), p) for p in params}
 
 
+# ---------------------------------------------------------------- brevity
+
+def check_prose(label, wordy, **cells):
+    """Note any prose cell that overruns its budget. Never rewrites the text.
+
+    Only the cells the model writes are measured. The verbatim URL, body, payload
+    and absence evidence have no budget: they are the evidence, and shortening
+    them to fit a column is the one thing this report must never do.
+    """
+    for kind, value in cells.items():
+        if kind == "notes":
+            notes = value if isinstance(value, list) else ([value] if value else [])
+            if len(notes) > MAX_NOTES:
+                wordy.append("%s  %d verdict bullets (budget %d)"
+                             % (label, len(notes), MAX_NOTES))
+            for n in notes:
+                if len(str(n)) > MAX_NOTE:
+                    wordy.append("%s  verdict bullet %d chars (budget %d): %s..."
+                                 % (label, len(str(n)), MAX_NOTE, str(n)[:60]))
+            continue
+        budget = {"conditions": MAX_CONDITION, "observation": MAX_OBSERVATION}[kind]
+        if value and len(str(value)) > budget:
+            wordy.append("%s  %s %d chars (budget %d)"
+                         % (label, kind, len(str(value)), budget))
+
+
 # ---------------------------------------------------------------- sheets
 
 def sheet_name(vendor, used):
@@ -273,7 +428,7 @@ def request_cell(ev):
     return "\n".join(parts)
 
 
-def vendor_sheet(wb, vendor, events, shots_dir, used_names, unverified):
+def vendor_sheet(wb, vendor, events, shots_dir, used_names, unverified, wordy):
     ws = wb.create_sheet(sheet_name(vendor, used_names))
     header(ws, EVENT_HEADERS, EVENT_COLS)
     tab = VENDOR_FILLS.get(str(vendor).strip().lower())
@@ -284,7 +439,7 @@ def vendor_sheet(wb, vendor, events, shots_dir, used_names, unverified):
     for ev in events:
         payload = ev.get("payload", None)
         if payload is not None:
-            pj = json.dumps(payload, indent=2, ensure_ascii=False)   # verbatim
+            pj = payload_text(payload, EVENT_COLS["D"], 8)           # values verbatim
         else:
             pj = nodash(ev.get("payload_note", "(no payload captured)"))
 
@@ -296,6 +451,8 @@ def vendor_sheet(wb, vendor, events, shots_dir, used_names, unverified):
         notes = ev.get("notes", [])
         notes_txt = nodash("\n\n".join(notes) if isinstance(notes, list) else str(notes))
         cond = nodash(ev.get("conditions", ""))
+        check_prose("%s / %s" % (vendor, ev.get("event", "")), wordy,
+                    conditions=cond, notes=notes)
 
         ws.cell(row=r, column=1, value=nodash(ev.get("event", ""))).font = Font(name=FONT, size=11, bold=True)
         ws.cell(row=r, column=2, value=cond).font = Font(name=FONT, size=10)
@@ -328,7 +485,7 @@ def vendor_sheet(wb, vendor, events, shots_dir, used_names, unverified):
     return r - 2
 
 
-def consent_sheet(ws, consent, shots_dir, unverified_consent):
+def consent_sheet(ws, consent, shots_dir, unverified_consent, wordy):
     """First tab. Descriptive only. There is deliberately NO pass/fail column."""
     ws.title = "Consent"
     header(ws, CONSENT_HEADERS, CONSENT_COLS)
@@ -372,6 +529,8 @@ def consent_sheet(ws, consent, shots_dir, unverified_consent):
             before += "\n\n" + str(c["evidence"])
         vals = [c.get("vendor", ""), before, c.get("signal", ""),
                 c.get("after", ""), c.get("observation", "")]
+        check_prose("Consent / %s" % c.get("vendor", ""), wordy,
+                    observation=c.get("observation", ""))
         for i, v in enumerate(vals, 1):
             cell = ws.cell(row=r, column=i, value=nodash(v))
             cell.font = Font(name=FONT, size=10, bold=(i == 1))
@@ -418,10 +577,12 @@ def main():
     wb = openpyxl.Workbook()
     used = set()
     unverified_consent = []
-    n_consent = consent_sheet(wb.active, consent, shots_dir, unverified_consent)  # tab 1
+    wordy = []
+    n_consent = consent_sheet(wb.active, consent, shots_dir, unverified_consent, wordy)  # tab 1
     used.add("consent")
     unverified = []
-    counts = [(v, vendor_sheet(wb, v, by_vendor[v], shots_dir, used, unverified)) for v in order]
+    counts = [(v, vendor_sheet(wb, v, by_vendor[v], shots_dir, used, unverified, wordy))
+              for v in order]
     wb.save(out_path)
 
     if len(os.path.abspath(out_path)) >= 259:
@@ -440,6 +601,13 @@ def main():
         for u in unverified_consent:
             print("       consent row %s" % u)
         print("     Re-check each with window.__nqaRequests() before handing this over.")
+    if wordy:
+        print("")
+        print("  %d prose cell(s) are longer than the report's style allows. The reader is an"
+              % len(wordy))
+        print("  analyst who knows these vendors: cut to observation only, no explanation.")
+        for w in wordy:
+            print("       %s" % w)
 
 
 if __name__ == "__main__":
