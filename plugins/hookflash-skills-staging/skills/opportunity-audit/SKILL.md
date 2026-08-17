@@ -305,8 +305,8 @@ step-to-step drop-off.
 
 **† Every "conversion rate" in that table is a workbook calculation, never a metric you ask GA4
 for.** Pull the two counts — `sessions` (and `totalUsers`) with `keyEvents` — and divide in the
-workbook. Asking for `sessionKeyEventRate` or `userKeyEventRate` directly costs you the de-sampling
-below, so the tab comes back an estimate for no gain.
+workbook. A rate cell backed by two visible counts can be audited and re-derived by the team
+reading it; a rate metric pulled directly cannot.
 
 **All three broken-down drop-offs come from `run_ga4_funnel_report` with `breakdown_dimension`
 set** — `deviceCategory`, the chosen channel dimension, and `landingPagePlusQueryString` — never
@@ -348,15 +348,15 @@ carry no signal for this purpose, and pull the top 20 that remain, by day:
 - This is one `answer_client_data_question` call using `pivots` — `date` down, `eventName` across,
   `eventCount` as the metric — with the excluded events removed by a `not` dimension filter on
   `eventName`, and the pivot limited to 20 values ordered by `eventCount`.
-- **A pivot cannot be de-sampled.** If the pivot comes back sampled, re-pull it as a flat
-  `date` × `eventName` × `eventCount` table with `desample` set and build the grid yourself in the
-  workbook — same tab, exact numbers. Only leave it as a sampled pivot if that flat pull also comes
-  back an estimate, and then say so on the tab.
+- If the pivot comes back sampled, record it on the tab's context line and on Data completeness
+  like any other sampled slice — see the sampling section below.
 
 **Item performance** — ecommerce only, skip it for lead gen. `itemName` against `itemsViewed`,
 `itemsAddedToCart` and `itemsPurchased`, full table, with two rates computed in the workbook:
-add-to-cart rate (added ÷ viewed) and purchase rate (purchased ÷ added). Put each rate immediately
-to the right of the count it is derived from, so a reader can follow one product across the row.
+add-to-cart rate (added ÷ viewed) and purchase rate (**purchased ÷ viewed** — how often a viewed
+product gets bought at all, not conditional on it having been added to cart). Put the add-to-cart
+rate immediately right of the added count and the purchase rate immediately right of the purchased
+count, so a reader can follow one product across the row.
 Include the property total as the first row, labelled, so a product's share is readable.
 
 If the property has no item-scoped data — an ecommerce site whose `view_item` events carry no items
@@ -364,50 +364,38 @@ array is common — the tab still exists and its context line says the metrics r
 that is a tracking finding, not an absence of products. Do not deliver a blank grid with no
 explanation, and do not quietly drop the tab.
 
-### Ask GA4 for exact numbers, not estimates
+### Sampling is reported, never repaired
 
-**Set `desample` on every `answer_client_data_question` slice you pull.** These numbers go into a
-workbook the client's experimentation team will read as fact, and GA4 hands back a sampled estimate
-in exactly the same shape as an exact answer. With `desample` set, a sampled query is re-run across
-acquisition-cohort buckets and summed, which is exact; an unsampled query costs nothing extra, so
-there is no reason to leave it off.
+**A sampled answer is GA4's estimate, and no exact version of it exists.** This was measured, not
+assumed (2026-08-17, live property): no dimension partitions GA4's session or user counts — every
+split-and-sum "de-sampling" scheme returns a number **more** biased than the estimate it replaces,
+which is why Tether does not offer one. Do not attempt your own: never chunk a date range and sum
+the pieces, never bucket by cohort or channel and add distinct counts together, and never present
+any such sum as exact.
 
-It has three limits worth knowing before you design a query:
+Three things follow from accepting the estimate:
 
-- **It only works on additive count metrics.** Ask for `sessions`, `totalUsers`, `keyEvents`,
-  `eventCount`, `itemsViewed` and compute the rates yourself in the workbook. A query that asks GA4
-  for a rate metric directly cannot be de-sampled — you would be adding percentages together — and
-  the tool will tell you it declined. This is the same reason the workbook stores rates as
-  fractions computed from two counts.
-- **`metric_filters` block it**, because GA4 applies them inside each bucket, so a row that only
-  clears the threshold in total would disappear. Pull the rows and filter them yourself.
-- **`run_ga4_funnel_report` has no `desample` parameter at all**, and neither does a pivot. Do not
-  go looking for one and never say you set one. Both still report their own completeness, so a
-  sampled answer from either can be *recorded* — but only one of them can be *fixed*.
+- **The estimate is defensible as-is.** It is unbiased, its noise is small at audit volumes, and it
+  is the same estimate the client's own GA4 Exploration would show for that query — sampling
+  happens on GA4's side and is disclosed by GA4, so a labelled estimate never becomes a number you
+  cannot explain.
+- **Do not shrink the question to dodge the label.** Shortening the range or dropping a breakdown
+  may return an unsampled answer, but it answers a *different question* — a shorter range is not
+  the range the rest of the audit reports on. That is a trade, not a fix, and it must never be
+  presented as one.
+- **Sampled data can motivate a hypothesis but cannot be its sole evidence**, and Step 4 says so in
+  that candidate's reason column.
 
-**A sampled funnel has no workaround, and the workbook has to say so.** A pivot does: re-pull it
-flat and de-sample that (see the daily-events tab above), same tab, exact numbers. A funnel does
-not. Shortening the range or dropping the breakdown may well return an unsampled answer, but it is
-an answer to a *different question* — a shorter range is not the range the rest of the audit reports
-on, and a funnel without its breakdown is not the tab you were asked for. That is a trade, not a
-fix, and it must never be presented as one. So when a funnel answer comes back sampled, record it in
-three places and move on:
-
-1. The **Funnel tab's context line**, on the drop-off block it applies to.
-2. Its row on **Data completeness**, with `no workaround: GA4 cannot de-sample a funnel report` in
-   the notes column. A sampled row with an empty notes column reads as an oversight; this is the one
-   case where the reader needs to know that nothing was left undone.
-3. **One sentence at handover.**
-
-Every step-to-step rate on a sampled funnel tab is then an estimate. It can still motivate a
-hypothesis, but it cannot be the sole evidence for one, and Step 4 says so in that candidate's
-reason column.
+When any answer — flat, pivot or funnel — comes back sampled, record it in three places and move
+on: the **tab's context line** on the block it applies to, its row on **Data completeness** with
+`GA4 estimate — no exact route exists` in the notes column (a sampled row with an empty notes
+column reads as an oversight), and **one sentence at handover**.
 
 **Read `data.completeness` on every response and keep it** — one record per slice. It carries
-whether the answer was sampled, whether it was de-sampled and whether that came out exact, whether
-rows were **thresholded** (withheld for privacy, so the totals are genuinely short), whether a
-cardinality `(other)` row swallowed the tail, and whether the table was truncated. These become the
-Data completeness tab, and you cannot reconstruct them afterwards.
+whether the answer was sampled and how much GA4 read, whether rows were **thresholded** (withheld
+for privacy, so the totals are genuinely short), whether a cardinality `(other)` row swallowed the
+tail, and whether the table was truncated. These become the Data completeness tab, and you cannot
+reconstruct them afterwards.
 
 If a response comes back with **no `completeness` block at all**, the connected Tether predates this
 and cannot tell you. Do not block and do not guess: build the tab with `unknown` in every column,
@@ -538,8 +526,8 @@ subtly wrong:
    or outage, say so on the row.
 
 **Check the completeness of the tab a candidate came from before you power a test on it.** The whole
-calculation is only as good as `n` and `p`. If the tab is marked exact on the Data completeness tab,
-say nothing. If it is sampled and could not be de-sampled, the row's reason column says the volume
+calculation is only as good as `n` and `p`. If the tab is unsampled on the Data completeness tab,
+say nothing. If it is sampled, the row's reason column says the volume
 is a GA4 estimate — the verdict usually survives, but a candidate sitting within a percentage point
 of a band boundary should not be presented as if the band were certain. If the tab is thresholded,
 `p` is computed from a numerator and denominator that are both short, so say that in the reason
@@ -606,7 +594,7 @@ One `.xlsx`, built with openpyxl, in this tab order:
 | Tab | Contents |
 |---|---|
 | **README** | Client and property name, GA4 property id, measurement id, date range, which channel grouping the audit reports on, the property totals for the range, and a one-line index of every tab. Nothing else — no data-source line, no funnel-type or starting-URL echo, no who-confirmed-it line, no derivation note, no generated timestamp. The reviewer knows how the workbook was made; the README is there to say what is in it |
-| **Data completeness** | One row per data tab, from the records kept in Step 3: rows in the tab, rows GA4 matched, truncated, sampled, whether it was de-sampled and whether that came out exact (or why it was skipped), thresholded, `(other)` row present, and a notes column. **No "% of data read" column** — `sampled` already answers the question the tab is asked, and a percentage that is `null` more often than not invited a reader to treat a blank as 100%. Second tab deliberately — a caveat you have to scroll to is a caveat nobody reads. See [What belongs in the Tab column](#what-belongs-in-the-tab-column) |
+| **Data completeness** | One row per data tab, from the records kept in Step 3: rows in the tab, rows GA4 matched, truncated, sampled (with `GA4 estimate — no exact route exists` in the notes when it is), thresholded, `(other)` row present, and a notes column. **No "% of data read" column** — `sampled` already answers the question the tab is asked, and a percentage that is `null` more often than not invited a reader to treat a blank as 100%. Second tab deliberately — a caveat you have to scroll to is a caveat nobody reads. See [What belongs in the Tab column](#what-belongs-in-the-tab-column) |
 | **Funnel**, then **Funnel x Device**, **Funnel x Channel** and **Funnel x Landing page** | The confirmed funnel joined to its whole-property drop-off, then one crosstab per tab. One table per sheet, laid out as [The funnel tabs](#the-funnel-tabs) describes. **No Tracking notes block** |
 | **One tab per Step 3 slice** | The full table for that slice, named plainly (`Landing pages`, `LP x Device`, `LP x Channel`, `Sources`, `Campaigns`, `Devices`, `New vs returning`, `Countries`, `Daily trend`, `Events by day`, `Items`…). Where the user asked for both channel groupings, the two tabs say which is which (`Channel (default)`, `Channel (custom)`) |
 | **Opportunities** | Every candidate from Step 4 — KEEP, STRETCH and DROP: the measured gap, the segment's users over the range, users per arm, the arm count, the baseline per-user rate, `n·p`, the detectable relative effect (or `cannot be powered`), the verdict, and the reason. The context line states the constant, the confidence and power, and the unit |
@@ -836,24 +824,33 @@ Three traps in the width code, all of which produce a wrong width silently:
 
 ### Charts
 
-Every chart in this workbook is built by the one function below, so that fifteen tabs produce
-fifteen charts that look like they belong together. **Do not hand-roll a chart for one tab** — if a
-tab needs something the function does not do, add the argument rather than writing a second
-chart-builder, or the workbook ends up with two visual languages in it.
+Every chart in this workbook is built by the one function below, so that every tab's charts look
+like they belong together. **Do not hand-roll a chart for one tab** — if a tab needs something the
+function does not do, add the argument rather than writing a second chart-builder, or the workbook
+ends up with two visual languages in it.
 
 A chart is a reading aid, not decoration: it goes to the right of the table on that same tab, and if
 the tab is a lookup table (`Sources` with 400 rows, `Items` with 90 products) the chart plots the
 head of it and its title says so.
 
+**Every metric column on a tab must appear on one of that tab's charts.** One chart per tab is the
+floor, not the ceiling: when a tab carries more metrics than one chart can hold legibly, stack
+further charts below the first (same left edge, one chart-height apart) rather than dropping a
+metric — a metric that is in the table but on no chart reads as an afterthought. Metrics of like
+scale share a chart; a metric that would be invisible against the others' axis (key events beside
+sessions, say) gets its own chart instead of a flat line at zero. **Dimensions may be capped —
+metrics may not**: "top 15 rows" is fine and the title says so, but every chart on the tab plots
+the same rows, so the charts read as views of one table.
+
 | Tab | Chart | Plotted against |
 |---|---|---|
 | Funnel | Bar, active users per step, in funnel order | Never sorted by size — the order *is* the finding |
 | Each `Funnel x …` tab | Grouped bar of step completion rate: series are the step transitions, categories are the segments | Plots the *rate*, not the users, because that is what makes two segments of different size comparable. `All traffic` is the leftmost category, so every segment is read against the baseline in the chart as well as the grid. Cap the channel and landing-page charts at the top 8 segments and say so in the title; the crosstab keeps all of them |
-| Landing pages, LP x Device, LP x Channel, Page types | Bar of sessions, top 15 rows, with conversion rate on a **secondary axis** | A rate against session counts is invisible on one axis |
-| Channel, Sources, Campaigns, Devices, Countries, New vs returning | Bar of sessions with conversion rate on a secondary axis, top 15 | |
-| Daily trend | Line, sessions and conversions by date, conversions on a secondary axis | |
+| Landing pages, LP x Device, LP x Channel, Page types | Bar of sessions and users, top 15 rows, with conversion rate on a **secondary axis**; key events (when the tab carries them) on a second chart over the same rows | A rate against session counts is invisible on one axis, and key events sit two orders of magnitude below sessions — on the first chart's axis they are a flat line at zero |
+| Channel, Sources, Campaigns, Devices, Countries, New vs returning | Bar of sessions and users with conversion rate on a secondary axis, top 15; key events on a second chart over the same rows | |
+| Daily trend | Line, sessions and conversions by date, conversions on a secondary axis; any further metric columns on a second line chart over the same dates | |
 | Events by day | Line, one series per event, top 8 events only | 20 lines is a scribble; the table still holds all 20 |
-| Items | Bar of items viewed, top 15 products, with add-to-cart rate on a secondary axis | |
+| Items | Grouped bar of items viewed, added to cart and purchased, top 15 products; a **second chart** of add-to-cart rate and purchase rate over the same products | The three counts share a scale; the two rates share a scale; counts and rates do not — two charts beat one chart hiding half the tab's metrics |
 | Opportunities | Bar of the detectable relative effect per candidate, KEEP first | `cannot be powered` rows are left out of the chart and stay in the table |
 | Data completeness, Hypotheses, README | No chart | Neither prose nor a manifest plots |
 
@@ -1071,9 +1068,11 @@ row. Fix and rebuild anything that fails; never deliver a workbook you have not 
 just a tab that looks like the old workbook, and every fault the last round was reviewed for was
 silent. So for each chart, assert:
 
-- `len(ws._charts)` is 1 on Funnel and on every `Funnel x …` tab, 1 on every tab the table above
-  says gets one, and 0 on README,
-  Data completeness and Hypotheses.
+- `len(ws._charts)` matches the chart table above per tab — 1 on Funnel and on every `Funnel x …`
+  tab, 2 on Items and on any tab whose key events (or other off-scale metric) earned a second
+  chart, and 0 on README, Data completeness and Hypotheses. Then check coverage the other way:
+  every metric column on the tab appears as a series on one of that tab's charts — a metric in the
+  table but on no chart fails the build's own bar, not just a preference.
 - **`x_axis.delete` and `y_axis.delete` are both `False`, not `None`** — `None` is the default and
   it means "no axis". If there is a secondary axis, check it too. This is the single check that
   would have caught the whole last round.
@@ -1095,11 +1094,11 @@ Hand over the workbook file, and in chat:
 - the funnel used, and that the user confirmed it before the pull
 - the date range and which channel grouping the tabs use
 - what was pulled: the count of slices and rows
-- **completeness in one or two sentences**, pointing at the tab: how many tabs came back exact, how
-  many were sampled and de-sampled, anything that could not be de-sampled and why, and anything
-  thresholded or truncated. "All 18 tabs exact" is a perfectly good version of this and worth
-  saying — the team asked how they would know, so silence is not an answer. **If a funnel came back
-  sampled, say that there is no workaround for it** rather than leaving it as an unexplained gap
+- **completeness in one or two sentences**, pointing at the tab: how many tabs came back unsampled,
+  how many are GA4 estimates (sampled), and anything thresholded or truncated. "All 18 tabs
+  unsampled" is a perfectly good version of this and worth saying — the team asked how they would
+  know, so silence is not an answer. **If anything came back sampled, say plainly that it is GA4's
+  estimate and that no exact route exists** rather than leaving it as an unexplained gap
 - the headline findings, briefly — three to five, each with its number
 - tests proposed and candidates dropped, as counts
 - **the data-quality flags from Step 3**, in plain sentences: what looked wrong, where, and what
