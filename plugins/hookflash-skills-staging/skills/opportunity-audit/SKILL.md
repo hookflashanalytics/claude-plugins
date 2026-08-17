@@ -353,8 +353,10 @@ carry no signal for this purpose, and pull the top 20 that remain, by day:
 
 **Item performance** — ecommerce only, skip it for lead gen. `itemName` against `itemsViewed`,
 `itemsAddedToCart` and `itemsPurchased`, full table, with two rates computed in the workbook:
-add-to-cart rate (added ÷ viewed) and purchase rate (purchased ÷ added). Put each rate immediately
-to the right of the count it is derived from, so a reader can follow one product across the row.
+add-to-cart rate (added ÷ viewed) and purchase rate (**purchased ÷ viewed** — how often a viewed
+product gets bought at all, not conditional on it having been added to cart). Put the add-to-cart
+rate immediately right of the added count and the purchase rate immediately right of the purchased
+count, so a reader can follow one product across the row.
 Include the property total as the first row, labelled, so a product's share is readable.
 
 If the property has no item-scoped data — an ecommerce site whose `view_item` events carry no items
@@ -822,24 +824,33 @@ Three traps in the width code, all of which produce a wrong width silently:
 
 ### Charts
 
-Every chart in this workbook is built by the one function below, so that fifteen tabs produce
-fifteen charts that look like they belong together. **Do not hand-roll a chart for one tab** — if a
-tab needs something the function does not do, add the argument rather than writing a second
-chart-builder, or the workbook ends up with two visual languages in it.
+Every chart in this workbook is built by the one function below, so that every tab's charts look
+like they belong together. **Do not hand-roll a chart for one tab** — if a tab needs something the
+function does not do, add the argument rather than writing a second chart-builder, or the workbook
+ends up with two visual languages in it.
 
 A chart is a reading aid, not decoration: it goes to the right of the table on that same tab, and if
 the tab is a lookup table (`Sources` with 400 rows, `Items` with 90 products) the chart plots the
 head of it and its title says so.
 
+**Every metric column on a tab must appear on one of that tab's charts.** One chart per tab is the
+floor, not the ceiling: when a tab carries more metrics than one chart can hold legibly, stack
+further charts below the first (same left edge, one chart-height apart) rather than dropping a
+metric — a metric that is in the table but on no chart reads as an afterthought. Metrics of like
+scale share a chart; a metric that would be invisible against the others' axis (key events beside
+sessions, say) gets its own chart instead of a flat line at zero. **Dimensions may be capped —
+metrics may not**: "top 15 rows" is fine and the title says so, but every chart on the tab plots
+the same rows, so the charts read as views of one table.
+
 | Tab | Chart | Plotted against |
 |---|---|---|
 | Funnel | Bar, active users per step, in funnel order | Never sorted by size — the order *is* the finding |
 | Each `Funnel x …` tab | Grouped bar of step completion rate: series are the step transitions, categories are the segments | Plots the *rate*, not the users, because that is what makes two segments of different size comparable. `All traffic` is the leftmost category, so every segment is read against the baseline in the chart as well as the grid. Cap the channel and landing-page charts at the top 8 segments and say so in the title; the crosstab keeps all of them |
-| Landing pages, LP x Device, LP x Channel, Page types | Bar of sessions, top 15 rows, with conversion rate on a **secondary axis** | A rate against session counts is invisible on one axis |
-| Channel, Sources, Campaigns, Devices, Countries, New vs returning | Bar of sessions with conversion rate on a secondary axis, top 15 | |
-| Daily trend | Line, sessions and conversions by date, conversions on a secondary axis | |
+| Landing pages, LP x Device, LP x Channel, Page types | Bar of sessions and users, top 15 rows, with conversion rate on a **secondary axis**; key events (when the tab carries them) on a second chart over the same rows | A rate against session counts is invisible on one axis, and key events sit two orders of magnitude below sessions — on the first chart's axis they are a flat line at zero |
+| Channel, Sources, Campaigns, Devices, Countries, New vs returning | Bar of sessions and users with conversion rate on a secondary axis, top 15; key events on a second chart over the same rows | |
+| Daily trend | Line, sessions and conversions by date, conversions on a secondary axis; any further metric columns on a second line chart over the same dates | |
 | Events by day | Line, one series per event, top 8 events only | 20 lines is a scribble; the table still holds all 20 |
-| Items | Bar of items viewed, top 15 products, with add-to-cart rate on a secondary axis | |
+| Items | Grouped bar of items viewed, added to cart and purchased, top 15 products; a **second chart** of add-to-cart rate and purchase rate over the same products | The three counts share a scale; the two rates share a scale; counts and rates do not — two charts beat one chart hiding half the tab's metrics |
 | Opportunities | Bar of the detectable relative effect per candidate, KEEP first | `cannot be powered` rows are left out of the chart and stay in the table |
 | Data completeness, Hypotheses, README | No chart | Neither prose nor a manifest plots |
 
@@ -1057,9 +1068,11 @@ row. Fix and rebuild anything that fails; never deliver a workbook you have not 
 just a tab that looks like the old workbook, and every fault the last round was reviewed for was
 silent. So for each chart, assert:
 
-- `len(ws._charts)` is 1 on Funnel and on every `Funnel x …` tab, 1 on every tab the table above
-  says gets one, and 0 on README,
-  Data completeness and Hypotheses.
+- `len(ws._charts)` matches the chart table above per tab — 1 on Funnel and on every `Funnel x …`
+  tab, 2 on Items and on any tab whose key events (or other off-scale metric) earned a second
+  chart, and 0 on README, Data completeness and Hypotheses. Then check coverage the other way:
+  every metric column on the tab appears as a series on one of that tab's charts — a metric in the
+  table but on no chart fails the build's own bar, not just a preference.
 - **`x_axis.delete` and `y_axis.delete` are both `False`, not `None`** — `None` is the default and
   it means "no axis". If there is a secondary axis, check it too. This is the single check that
   would have caught the whole last round.
