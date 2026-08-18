@@ -303,10 +303,18 @@ step-to-step drop-off.
 | **Daily event counts, top 20 events** | Which behaviours move together, and which day a tracking change landed |
 | **Item name × items viewed / added to cart / purchased** (ecommerce) | Which products lose people, and where |
 
-**† Every "conversion rate" in that table is a workbook calculation, never a metric you ask GA4
-for.** Pull the two counts — `sessions` (and `totalUsers`) with `keyEvents` — and divide in the
-workbook. A rate cell backed by two visible counts can be audited and re-derived by the team
-reading it; a rate metric pulled directly cannot.
+**† "Conversions" means the funnel's final event — `purchase` here, the converting action the user
+named for lead gen — never GA4's `keyEvents` aggregate.** Clients mark several events as key
+events, so the aggregate quietly mixes newsletter signups and add-to-carts into the purchase story;
+the experimentation team's review deleted the `Key events` column from every tab it appeared on.
+Pull the final event's count and its converting users, head the column with the event's plain name
+(`Purchases`, `Leads`), and never write a column headed `Key events`.
+
+**And every "conversion rate" in that table is a workbook calculation, never a metric you ask GA4
+for.** Pull the two counts — `sessions` (and `totalUsers`) with the conversion event count — and
+divide in the workbook: conversion rate (per session) = purchases ÷ sessions, purchase rate (per
+user) = purchasers ÷ users. A rate cell backed by two visible counts can be audited and re-derived
+by the team reading it; a rate metric pulled directly cannot.
 
 **All three broken-down drop-offs come from `run_ga4_funnel_report` with `breakdown_dimension`
 set** — `deviceCategory`, the chosen channel dimension, and `landingPagePlusQueryString` — never
@@ -343,6 +351,9 @@ carry no signal for this purpose, and pull the top 20 that remain, by day:
 - **Excluded from the ranking:** `session_start`, `page_view`, `user_engagement`, `begin_checkout`,
   `add_shipping_info`, `add_payment_info`. The first three swamp any list by construction; the last
   three are funnel steps that already have their own tabs and their own drop-off analysis.
+- **Always included, whatever its rank: the funnel's final event** (`purchase` here). The
+  correlation row below needs its daily series, and a conversion event on a busy property can sit
+  outside the top 20 by raw count.
 - Dates down the rows, one column per event, a total row at the top under the context line, ordered
   by event volume descending so the widest columns are nearest the dates.
 - This is one `answer_client_data_question` call using `pivots` — `date` down, `eventName` across,
@@ -350,6 +361,16 @@ carry no signal for this purpose, and pull the top 20 that remain, by day:
   `eventName`, and the pivot limited to 20 values ordered by `eventCount`.
 - If the pivot comes back sampled, record it on the tab's context line and on Data completeness
   like any other sampled slice — see the sampling section below.
+
+**The correlation row.** One labelled row directly under the last date, headed
+`Correlation to purchase` (name the actual final event), holding a live formula per event column:
+`=CORREL(B4:B34, $M$4:$M$34)` — each event's daily series against the final event's column, the
+final event's range absolute so the row can be filled across. It says at a glance which behaviours
+move with conversion and which are noise, which is what the team asked this tab to answer. Three
+mechanics: the formulas mean the finished workbook must be recalculated before delivery (see the
+build order); the row gets the red-to-green colour scale from [Conditional
+formatting](#conditional-formatting); and it is a summary row, so it stays out of the autofilter
+range and out of the chart's data rows.
 
 **Item performance** — ecommerce only, skip it for lead gen. `itemName` against `itemsViewed`,
 `itemsAddedToCart` and `itemsPurchased`, full table, with two rates computed in the workbook:
@@ -363,6 +384,37 @@ If the property has no item-scoped data — an ecommerce site whose `view_item` 
 array is common — the tab still exists and its context line says the metrics returned empty and why
 that is a tracking finding, not an absence of products. Do not deliver a blank grid with no
 explanation, and do not quietly drop the tab.
+
+### Page types: the buckets, the small roll-up, and the Other pages tab
+
+The Page types tab rolls the landing pages up by the patterns confirmed in 2c, and the review
+found three ways the roll-up misleads unless it is disciplined:
+
+- **Head the page-count column so it cannot be misread.** The reviewer had to ask whether
+  `Landing pages` meant the number of pages in the bucket. It does, so say so: head it
+  `Pages in bucket`.
+- **Small page types are grouped, not listed.** A bucket carrying **less than 1% of the property's
+  users** (and not an artefact — see below) collapses into one row, `Other (small page types)`,
+  whose counts are the sum of what it absorbed and whose context is one line naming what went in
+  ("Account, Search, Checkout, Cart, Policies"). Five rows of double-digit users are not five
+  findings; they are noise wearing a table. The 1% bar is fixed — do not pick a bar per run, for
+  the same reproducibility reason as the KEEP threshold.
+- **`Other` is a classification failure bucket, not a page type.** It holds the pages the 2c
+  patterns failed to place, so its size measures the patterns, not the site. **If `Other` carries
+  more than 2% of sessions, the patterns are not finished** — go back, read what fell through, and
+  extend the patterns until what remains is genuinely miscellaneous. It is distinct from
+  `Other (small page types)`, whose contents are classified fine and merely small; do not merge
+  the two.
+- **Artefact buckets stay separate whatever their size.** A Shopify Web Pixel sandbox bucket or a
+  post-purchase order-status bucket is a tracking observation, and folding it into a roll-up hides
+  exactly what the label exists to disclose.
+
+**The Other pages tab.** Whatever remains in `Other` gets a drill-down tab directly after Page
+types: every landing page classified `Other`, with its sessions, users and purchases, ordered by
+sessions descending. The reviewer asked for it by name — "could we get a tab showing what has been
+classified as other?" — because an unexplained bucket cannot be reviewed. It is derived from the
+Landing pages pull, so its Data completeness row mirrors that tab's, with `derived from Landing
+pages` in the notes.
 
 ### Sampling is reported, never repaired
 
@@ -596,7 +648,8 @@ One `.xlsx`, built with openpyxl, in this tab order:
 | **README** | Client and property name, GA4 property id, measurement id, date range, which channel grouping the audit reports on, the property totals for the range, and a one-line index of every tab. Nothing else — no data-source line, no funnel-type or starting-URL echo, no who-confirmed-it line, no derivation note, no generated timestamp. The reviewer knows how the workbook was made; the README is there to say what is in it |
 | **Data completeness** | One row per data tab, from the records kept in Step 3: rows in the tab, rows GA4 matched, truncated, sampled (with `GA4 estimate — no exact route exists` in the notes when it is), thresholded, `(other)` row present, and a notes column. **No "% of data read" column** — `sampled` already answers the question the tab is asked, and a percentage that is `null` more often than not invited a reader to treat a blank as 100%. Second tab deliberately — a caveat you have to scroll to is a caveat nobody reads. See [What belongs in the Tab column](#what-belongs-in-the-tab-column) |
 | **Funnel**, then **Funnel x Device**, **Funnel x Channel** and **Funnel x Landing page** | The confirmed funnel joined to its whole-property drop-off, then one crosstab per tab. One table per sheet, laid out as [The funnel tabs](#the-funnel-tabs) describes. **No Tracking notes block** |
-| **One tab per Step 3 slice** | The full table for that slice, named plainly (`Landing pages`, `LP x Device`, `LP x Channel`, `Sources`, `Campaigns`, `Devices`, `New vs returning`, `Countries`, `Daily trend`, `Events by day`, `Items`…). Where the user asked for both channel groupings, the two tabs say which is which (`Channel (default)`, `Channel (custom)`) |
+| **One tab per Step 3 slice** | The full table for that slice, named plainly (`Landing pages`, `LP x Device`, `LP x Channel`, `Page types`, `Sources`, `Campaigns`, `Devices`, `New vs returning`, `Countries`, `Daily trend`, `Events by day`, `Items`…). Where the user asked for both channel groupings, the two tabs say which is which (`Channel (default)`, `Channel (custom)`). Conversion columns are the funnel's final event (`Purchases`), never `Key events` |
+| **Other pages** | Directly after Page types: every landing page classified `Other`, per [the Page types section](#page-types-the-buckets-the-small-roll-up-and-the-other-pages-tab) |
 | **Opportunities** | Every candidate from Step 4 — KEEP, STRETCH and DROP: the measured gap, the segment's users over the range, users per arm, the arm count, the baseline per-user rate, `n·p`, the detectable relative effect (or `cannot be powered`), the verdict, and the reason. The context line states the constant, the confidence and power, and the unit |
 | **Hypotheses** | One row per KEEP or STRETCH test: name, IF, THEN, BECAUSE, evidence (tab + row/segment it traces to), pages, audience, primary metric, secondary metrics, expected MDE, its Step 4 verdict, the seven priority sub-scores, total, rank |
 
@@ -652,7 +705,7 @@ The funnel gets **one tab per table**, not one tab with five tables stacked down
 | **Funnel x Device** | The device crosstab |
 | **Funnel x Channel (default)** | The default-grouping crosstab |
 | **Funnel x Channel (custom)** | The custom-grouping crosstab, where the user asked for both |
-| **Funnel x Landing page** | The landing-page crosstab, top 15 |
+| **Funnel x Landing page** | The landing-page crosstab, top 15, with a `Sessions landing here` column (below) |
 
 **Stacking them cost every one of them its column widths.** `fit_columns` sizes a column from the
 widest cell anywhere in that column *on the sheet*, so a `Page URL` in column C at 55 characters set
@@ -679,19 +732,37 @@ step's completion rate in the column immediately right of the count it comes fro
 Items tab uses, so a reader can follow one segment across the row:
 
 ```
-Channel (default) | view_item_list | view_item | % of view_item_list | add_to_cart | % of view_item | … | Overall
-All traffic       |         24,661 |    15,691 |               63.6% |       3,563 |          22.7% | … |    2.5%
-Organic Search    |          7,081 |     4,778 |               67.5% |       1,104 |          23.1% | … |    3.1%
-Organic Social    |          3,845 |     1,675 |               43.6% |         232 |          13.9% | … |    1.1%
+Channel (default) | view_item_list | view_item | PLP to PDP CTR | add_to_cart | % A2C on PDP | begin_checkout | A2C to checkout CTR | purchase | Checkout start to purchase rate | PLP to purchase rate | PDP to purchase rate | A2C to purchase rate
+All traffic       |         24,661 |    15,691 |          63.6% |       3,563 |        22.7% |          1,978 |               55.5% |      624 |                           31.6% |                 2.5% |                 4.0% |                17.5%
+Organic Search    |          7,081 |     4,778 |          67.5% |       1,104 |        23.1% |            631 |               57.2% |      211 |                           33.4% |                 3.0% |                 4.4% |                19.1%
+Organic Social    |          3,845 |     1,675 |          43.6% |         232 |        13.9% |            118 |               50.9% |       18 |                           15.3% |                 0.5% |                 1.1% |                 7.8%
 ```
+
+**Rate columns are named in journey language, never `% of <event>`.** The review renamed every one
+of them: a reader should not have to reverse-engineer a denominator from an event name. For the
+standard ecommerce funnel, use exactly these: `PLP to PDP CTR` (view_item_list → view_item),
+`% A2C on PDP` (view_item → add_to_cart), `A2C to checkout CTR` (add_to_cart → begin_checkout),
+`Checkout start to purchase rate` (begin_checkout → purchase). For any other funnel, build the
+same shape from the short step labels the walk produced: `<from step> to <to step> rate`
+("Form open to step 2 rate"). Use the identical names on every crosstab — the chart legends
+inherit them, and two tabs naming the same rate differently reads as two different metrics.
+
+**After the step columns come the to-purchase columns** — one per non-final step, each that step's
+users ÷ the final step's users: `PLP to purchase rate` (which replaces the old `Overall`, first
+step → purchase), `PDP to purchase rate`, `A2C to purchase rate`. The step-to-step rates say where
+the leak is; the to-purchase family says what each stage of traffic is ultimately worth, which is
+the number people look for first and computing it across ten columns by eye is exactly what a
+table should save them.
 
 **Every crosstab opens with an `All traffic` row**, bold, carrying the whole-property funnel from the
 Funnel tab. It is what makes the grid answer the question the team actually has, which is never "what
 is Organic Search's add-to-cart rate" but "is Organic Search worse than everyone else at it". The
 rows below it are ordered by first-step users, descending.
 
-**Last column is `Overall`** — final step ÷ first step — because that is the number people look for
-first and computing it across ten columns by eye is exactly what a table should save them.
+**`Funnel x Landing page` gets one extra column**, `Sessions landing here`, immediately right of
+the landing page: that page's sessions over the range, the same number its row on the Landing
+pages tab reports (the property total on the `All traffic` row). The funnel counts are user-scoped
+and top-15-capped, so this is what anchors each row back to the traffic it represents.
 
 Two properties of this shape worth knowing:
 
@@ -708,12 +779,31 @@ Two properties of this shape worth knowing:
 [Deliver](#deliver)). These tabs are for the experimentation team, and how the tags are wired is not
 what they are here to read.
 
+### Conditional formatting
+
+The review asked for colour on the funnel rates, and the correlation row needs it to be readable
+at all. Exactly three ranges get a 3-colour scale (`ColorScaleRule`, min → 50th percentile → max),
+and nothing else in the workbook gets conditional formatting:
+
+| Range | Scale | Why this orientation |
+|---|---|---|
+| Funnel tab, `Completion rate to next step` column | red `F8696B` → yellow `FFEB84` → green `63BE7B` | High completion is good |
+| Funnel tab, `Abandonment rate` column | green → yellow → red | High abandonment is bad |
+| Events by day, the correlation row | red → yellow → green | Strong co-movement with purchase is the signal being hunted |
+
+Orientation is part of the spec: a scale that colours the best completion rate red (which is what
+Excel's default preset does on a rate column) makes the reader distrust every other colour in the
+file. Apply the scales after the data is written and before the charts.
+
 ### Column widths and context lines
 
 Run both of these over **every sheet** once the data is written, widths first, and only then add the
-charts — the whole build order is: write every tab → `fit_columns` → `fit_banner_rows` → charts →
-save. Do not hand-pick widths per tab; they drift, and the tab you forget is the one that gets
-forwarded.
+charts — the whole build order is: write every tab → `fit_columns` → `fit_banner_rows` →
+conditional formatting → charts → save → **recalculate**. The Events by day correlation row is a
+live formula, so the saved file has no cached values until LibreOffice recalculates it
+(`soffice --headless --convert-to xlsx` in place, or the xlsx skill's `recalc.py` where available)
+— skip that and the row reads as blank in every previewer. Do not hand-pick widths per tab; they
+drift, and the tab you forget is the one that gets forwarded.
 
 ```python
 from openpyxl.utils import get_column_letter
@@ -837,19 +927,19 @@ head of it and its title says so.
 floor, not the ceiling: when a tab carries more metrics than one chart can hold legibly, stack
 further charts below the first (same left edge, one chart-height apart) rather than dropping a
 metric — a metric that is in the table but on no chart reads as an afterthought. Metrics of like
-scale share a chart; a metric that would be invisible against the others' axis (key events beside
+scale share a chart; a metric that would be invisible against the others' axis (purchases beside
 sessions, say) gets its own chart instead of a flat line at zero. **Dimensions may be capped —
 metrics may not**: "top 15 rows" is fine and the title says so, but every chart on the tab plots
 the same rows, so the charts read as views of one table.
 
 | Tab | Chart | Plotted against |
 |---|---|---|
-| Funnel | Bar, active users per step, in funnel order | Never sorted by size — the order *is* the finding |
-| Each `Funnel x …` tab | Grouped bar of step completion rate: series are the step transitions, categories are the segments | Plots the *rate*, not the users, because that is what makes two segments of different size comparable. `All traffic` is the leftmost category, so every segment is read against the baseline in the chart as well as the grid. Cap the channel and landing-page charts at the top 8 segments and say so in the title; the crosstab keeps all of them |
-| Landing pages, LP x Device, LP x Channel, Page types | Bar of sessions and users, top 15 rows, with conversion rate on a **secondary axis**; key events (when the tab carries them) on a second chart over the same rows | A rate against session counts is invisible on one axis, and key events sit two orders of magnitude below sessions — on the first chart's axis they are a flat line at zero |
-| Channel, Sources, Campaigns, Devices, Countries, New vs returning | Bar of sessions and users with conversion rate on a secondary axis, top 15; key events on a second chart over the same rows | |
-| Daily trend | Line, sessions and conversions by date, conversions on a secondary axis; any further metric columns on a second line chart over the same dates | |
-| Events by day | Line, one series per event, top 8 events only | 20 lines is a scribble; the table still holds all 20 |
+| Funnel | **Funnel-shaped bar** (see [The funnel-shaped chart](#the-funnel-shaped-chart)), active users per step, in funnel order | Never sorted by size — the order *is* the finding |
+| Each `Funnel x …` tab | Grouped bar of the step-to-step rates: series are the step transitions (`PLP to PDP CTR`, …), categories are the segments; a **second grouped bar** of the to-purchase rates (`PLP/PDP/A2C to purchase rate`) over the same segments | Plots the *rate*, not the users, because that is what makes two segments of different size comparable. `All traffic` is the leftmost category, so every segment is read against the baseline in the chart as well as the grid. The to-purchase rates sit an order of magnitude below the step rates, so sharing one chart flattens them. Cap the channel and landing-page charts at the top 8 segments and say so in the title; the crosstab keeps all of them |
+| Landing pages, LP x Device, LP x Channel, Page types, Other pages | Bar of sessions and users, top 15 rows, with conversion rate on a **secondary axis**; purchases on a second chart over the same rows | A rate against session counts is invisible on one axis, and purchases sit two orders of magnitude below sessions — on the first chart's axis they are a flat line at zero |
+| Channel, Sources, Campaigns, Devices, Countries, New vs returning | Bar of sessions and users with conversion rate on a secondary axis, top 15; purchases on a second chart over the same rows | |
+| Daily trend | Line, sessions and purchases by date, purchases on a secondary axis; any further metric columns on a second line chart over the same dates | |
+| Events by day | Line, one series per event, top 8 events only | 20 lines is a scribble; the table still holds all 20. The correlation row is a summary, not a date — `last_row` for these charts is the last date row |
 | Items | Grouped bar of items viewed, added to cart and purchased, top 15 products; a **second chart** of add-to-cart rate and purchase rate over the same products | The three counts share a scale; the two rates share a scale; counts and rates do not — two charts beat one chart hiding half the tab's metrics |
 | Opportunities | Bar of the detectable relative effect per candidate, KEEP first | `cannot be powered` rows are left out of the chart and stay in the table |
 | Data completeness, Hypotheses, README | No chart | Neither prose nor a manifest plots |
@@ -989,6 +1079,26 @@ def add_chart(ws, *, kind, header_row, first_row, last_row, cat_col, value_cols,
     ws.add_chart(primary, f"{get_column_letter(anchor_col)}{header_row + 2}")
 ```
 
+#### The funnel-shaped chart
+
+The Funnel tab's chart reads as a funnel, not a column chart — steps down the side, each bar
+centred, in step order. Excel's native funnel type is chartEx XML, which **openpyxl cannot
+write**, so build the standard equivalent as a `kind="funnel"` branch in `add_chart` rather than a
+second chart-builder:
+
+- A **stacked horizontal bar** (`BarChart`, `type="bar"`, `grouping="stacked"`, `overlap=100`) with
+  two series: a **spacer** first — `(max(users) − users) / 2` per step — then the active-users
+  series. The spacer centres each bar, which is the whole funnel illusion.
+- The spacer's values live in a helper column to the right of the table, headed `Chart spacer`,
+  treated exactly like `Chart label`: outside the autofilter, a chart aid, not data.
+- The spacer series gets `noFill` on fill and line so it is invisible; the users series is
+  `TAPA_BLUE` with **data labels showing the value** (`dLbls`, `showVal=True`) — a funnel's numbers
+  are read off the bars, not the axis.
+- `legend = None` (one visible series), and reverse the category axis so step 1 sits at the top:
+  `chart.x_axis.scaling.orientation = "maxMin"` — in openpyxl `x_axis` is the *category* axis even
+  on a horizontal bar, where it is drawn vertically (`axPos "l"`, with the value axis at `"b"`).
+  Keep both axes styled and visible per `_style_axis`; the value axis keeps its `#,##0` format.
+
 **Long category labels get a `Chart label` column.** Excel truncates a rotated axis label to
 whatever fits and appends an ellipsis, so a landing-page chart comes back as fifteen bars captioned
 `/products/currentbody-…`, all identical. **A rotated label holds about 24 characters at this chart
@@ -1001,8 +1111,8 @@ of the autofilter range: it is a chart aid, not data.
 
 `Funnel x Landing page` needs one too, since its categories are landing pages. `Funnel x Device` and
 `Funnel x Channel` do not — those categories are short by nature. On all three, the **series**
-come from the crosstab's rate headers (`% of view_item_list`, `% of view_item`, …), which say which
-denominator each rate uses and are short enough for a legend as they stand.
+come from the crosstab's rate headers (`PLP to PDP CTR`, `% A2C on PDP`, …), which name the
+journey each rate measures and are short enough for a legend as they stand.
 
 Six things that go wrong, in order of how easily they go unnoticed. The first three were all
 present in every chart of the first runs and are the reason those charts had no axes at all:
@@ -1061,16 +1171,23 @@ values in its `Tab` column, as a set, equal `wb.sheetnames` minus `README`, `Dat
 `Opportunities` and `Hypotheses` — no extras, nothing missing, and every value an exact sheet name.
 A missing row reads as "that tab was fine", and an extra row is either a tab you renamed or a
 data-quality flag that has wandered onto the wrong tab. Set equality catches both, where eyeballing
-the column catches neither. Those checks cost nothing and catch a tab you built before adding a long
-row. Fix and rebuild anything that fails; never deliver a workbook you have not reopened.
+the column catches neither. **Three more, from the review round:** assert no header cell anywhere
+in the workbook reads `Key events` (the aggregate the review deleted — its reappearance is a
+regression, not a choice); assert the three conditional-formatting scales exist on their ranges
+with the orientations the table above fixes; and after the recalculation pass, assert the
+correlation row holds numbers between −1 and 1, not formula strings or blanks — an unrecalculated
+file looks finished in openpyxl and empty in Excel's preview. Those checks cost nothing and catch
+a tab you built before adding a long row. Fix and rebuild anything that fails; never deliver a
+workbook you have not reopened.
 
 **Check the charts, and check them properly.** A chart that failed to build leaves no error behind,
 just a tab that looks like the old workbook, and every fault the last round was reviewed for was
 silent. So for each chart, assert:
 
-- `len(ws._charts)` matches the chart table above per tab — 1 on Funnel and on every `Funnel x …`
-  tab, 2 on Items and on any tab whose key events (or other off-scale metric) earned a second
-  chart, and 0 on README, Data completeness and Hypotheses. Then check coverage the other way:
+- `len(ws._charts)` matches the chart table above per tab — 1 on Funnel, 2 on every `Funnel x …`
+  tab (step rates + to-purchase rates), 2 on Items and on any tab whose purchases (or other
+  off-scale metric) earned a second chart, and 0 on README, Data completeness and Hypotheses. Then
+  check coverage the other way:
   every metric column on the tab appears as a series on one of that tab's charts — a metric in the
   table but on no chart fails the build's own bar, not just a preference.
 - **`x_axis.delete` and `y_axis.delete` are both `False`, not `None`** — `None` is the default and
