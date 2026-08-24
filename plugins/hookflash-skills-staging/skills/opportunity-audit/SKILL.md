@@ -406,15 +406,23 @@ found three ways the roll-up misleads unless it is disciplined:
   `Landing pages` meant the number of pages in the bucket. It does, so say so: head it
   `Pages in bucket`.
 - **Exactly one `Other` row — never two.** Two kinds of page collapse into it: every page type
-  whose bucket carries **less than 5% of the property's sessions** (and is not an artefact — see
-  below), and every page the 2c patterns failed to classify. The counts are the sum of what the
-  row absorbed, and the tab's context line names what went in ("Other = Account, Search, Cart,
-  Policies, plus 214 unclassified pages"). An earlier run shipped `Other` and
-  `Other (small page types)` as two separate rows; the reviewer's note asked for small categories
-  to be *consolidated under Other*, not for a second Other — do not reintroduce the split. The 5%
-  bar is fixed — do not pick a bar per run, for the same reproducibility reason as the KEEP
-  threshold. Five rows of double-digit users are not five findings; they are noise wearing a
-  table.
+  whose bucket carries **less than 5% of the property's sessions** (and is neither a journey page
+  type nor an artefact — see below), and every page the 2c patterns failed to classify. The
+  counts are the sum of what the row absorbed, and the tab's context line names what went in
+  ("Other = Account, Search, Policies, plus 214 unclassified pages"). An earlier run shipped
+  `Other` and `Other (small page types)` as two separate rows; the reviewer's note asked for
+  small categories to be *consolidated under Other*, not for a second Other — do not reintroduce
+  the split. The 5% bar is fixed — do not pick a bar per run, for the same reproducibility reason
+  as the KEEP threshold. Five rows of double-digit users are not five findings; they are noise
+  wearing a table.
+- **Journey page types are never rolled up, whatever their share.** Any page type that appears in
+  the confirmed funnel or the core browse path — Home, PLP, PDP, cart, checkout on ecommerce; the
+  service, form and confirmation page types on lead gen — keeps its own row however small it is.
+  The 5% bar exists to consolidate the miscellaneous tail, and on a top-heavy property it would
+  otherwise swallow the journey itself: a real run where PDP and Home carried 84% of sessions put
+  PLP — the funnel's own first step, at ~3% — into `Other`, which is the single worst page type to
+  hide from a CRO review. The exempt list is not a judgement call per run: it is exactly the page
+  types the 2c walk confirmed as the journey.
 - **Unclassified pages still measure the patterns, not the site.** They land in `Other` along
   with the small types, but they are tracked separately inside it: **if the unclassified pages
   alone carry more than 2% of sessions, the patterns are not finished** — go back, read what fell
@@ -437,7 +445,8 @@ inspectable. One row per page type, in the order the rules are applied (first ma
 order is part of the rule), holding the page type's name, **the exact regex used to classify it —
 verbatim, exactly as the code ran it**, the number of landing pages it matched, and one example
 URL it matched. Close with one row per artefact bucket in the same shape, and a final `Other` row
-stating it is the residual: the sub-5% types it absorbed (named) plus everything no regex matched.
+stating it is the residual: the sub-5% non-journey types it absorbed (named) plus everything no
+regex matched.
 This tab is why a reviewer can check the roll-up instead of trusting it. It is built from the
 audit's own logic, not from a GA4 response, so it gets no Data completeness row and no chart.
 
