@@ -251,7 +251,9 @@ Post exactly this, in this order, and nothing else:
    it in the walk — a real path, not a description of one ("the PDP"). Users in range is there
    because a funnel that does not descend is a funnel in the wrong order, and that is the single
    most useful thing on the row for spotting it.
-3. **The page-type patterns** you propose, as one short line each: `PDP: /products/*`.
+3. **The page-type patterns** you propose, as one short line each: `PDP: /products/*`. Behind
+   each shorthand is a real regex — the one the classification will actually run — and those
+   regexes are what the workbook's Categorisation rules tab later records verbatim.
 4. **Notes, only if there is something the user must know to answer** — at most three, one line
    each, no paragraphs. "Checkout is on a Shopify domain, so client-side tag capture came back empty;
    GA4 does record `begin_checkout` and `purchase`."
@@ -303,12 +305,22 @@ step-to-step drop-off.
 | **Daily event counts, top 20 events** | Which behaviours move together, and which day a tracking change landed |
 | **Item name × items viewed / added to cart / purchased** (ecommerce) | Which products lose people, and where |
 
-**† "Conversions" means the funnel's final event — `purchase` here, the converting action the user
-named for lead gen — never GA4's `keyEvents` aggregate.** Clients mark several events as key
-events, so the aggregate quietly mixes newsletter signups and add-to-carts into the purchase story;
-the experimentation team's review deleted the `Key events` column from every tab it appeared on.
-Pull the final event's count and its converting users, head the column with the event's plain name
-(`Purchases`, `Leads`), and never write a column headed `Key events`.
+**† "Conversions" means the funnel's final event, never GA4's `keyEvents` aggregate.** Which event
+that is depends on the funnel type:
+
+- **Ecommerce: `purchase`, and only `purchase`, unless the user tells you otherwise.** Not
+  `begin_checkout`, not a custom order-complete event sitting beside a working `purchase`.
+- **Non-ecommerce (lead gen or anything else): whatever the client's own key events say converting
+  is.** There is no `purchase` to lean on, so the conversion event is the converting action
+  confirmed in Step 2 — read from the property's key events (`get_ga4_property_config`) and the
+  user's Step 1 answer — whatever it happens to be called (`generate_lead`, `quote_complete`,
+  `form_submit_step3`).
+
+Either way the *aggregate* is banned: clients mark several events as key events, so `keyEvents`
+quietly mixes newsletter signups and add-to-carts into the conversion story; the experimentation
+team's review deleted the `Key events` column from every tab it appeared on. Pull the final
+event's count and its converting users, head the column with the event's plain name (`Purchases`,
+`Leads`, `Quotes completed`), and never write a column headed `Key events`.
 
 **And every "conversion rate" in that table is a workbook calculation, never a metric you ask GA4
 for.** Pull the two counts — `sessions` (and `totalUsers`) with the conversion event count — and
@@ -385,7 +397,7 @@ array is common — the tab still exists and its context line says the metrics r
 that is a tracking finding, not an absence of products. Do not deliver a blank grid with no
 explanation, and do not quietly drop the tab.
 
-### Page types: the buckets, the small roll-up, and the Other pages tab
+### Page types: the buckets, the one Other row, and the categorisation tabs
 
 The Page types tab rolls the landing pages up by the patterns confirmed in 2c, and the review
 found three ways the roll-up misleads unless it is disciplined:
@@ -393,28 +405,41 @@ found three ways the roll-up misleads unless it is disciplined:
 - **Head the page-count column so it cannot be misread.** The reviewer had to ask whether
   `Landing pages` meant the number of pages in the bucket. It does, so say so: head it
   `Pages in bucket`.
-- **Small page types are grouped, not listed.** A bucket carrying **less than 1% of the property's
-  users** (and not an artefact — see below) collapses into one row, `Other (small page types)`,
-  whose counts are the sum of what it absorbed and whose context is one line naming what went in
-  ("Account, Search, Checkout, Cart, Policies"). Five rows of double-digit users are not five
-  findings; they are noise wearing a table. The 1% bar is fixed — do not pick a bar per run, for
-  the same reproducibility reason as the KEEP threshold.
-- **`Other` is a classification failure bucket, not a page type.** It holds the pages the 2c
-  patterns failed to place, so its size measures the patterns, not the site. **If `Other` carries
-  more than 2% of sessions, the patterns are not finished** — go back, read what fell through, and
-  extend the patterns until what remains is genuinely miscellaneous. It is distinct from
-  `Other (small page types)`, whose contents are classified fine and merely small; do not merge
-  the two.
+- **Exactly one `Other` row — never two.** Two kinds of page collapse into it: every page type
+  whose bucket carries **less than 5% of the property's sessions** (and is not an artefact — see
+  below), and every page the 2c patterns failed to classify. The counts are the sum of what the
+  row absorbed, and the tab's context line names what went in ("Other = Account, Search, Cart,
+  Policies, plus 214 unclassified pages"). An earlier run shipped `Other` and
+  `Other (small page types)` as two separate rows; the reviewer's note asked for small categories
+  to be *consolidated under Other*, not for a second Other — do not reintroduce the split. The 5%
+  bar is fixed — do not pick a bar per run, for the same reproducibility reason as the KEEP
+  threshold. Five rows of double-digit users are not five findings; they are noise wearing a
+  table.
+- **Unclassified pages still measure the patterns, not the site.** They land in `Other` along
+  with the small types, but they are tracked separately inside it: **if the unclassified pages
+  alone carry more than 2% of sessions, the patterns are not finished** — go back, read what fell
+  through on the Other pages tab, and extend the patterns until what remains is genuinely
+  miscellaneous.
 - **Artefact buckets stay separate whatever their size.** A Shopify Web Pixel sandbox bucket or a
   post-purchase order-status bucket is a tracking observation, and folding it into a roll-up hides
   exactly what the label exists to disclose.
 
-**The Other pages tab.** Whatever remains in `Other` gets a drill-down tab directly after Page
-types: every landing page classified `Other`, with its sessions, users and purchases, ordered by
-sessions descending. The reviewer asked for it by name — "could we get a tab showing what has been
+**The Other pages tab.** Whatever rolled into `Other` gets a drill-down tab directly after Page
+types: every landing page in the row, with the page type it was classified as (`(unclassified)`
+where the patterns failed to place it), its sessions, users and purchases, ordered by sessions
+descending. The reviewer asked for it by name — "could we get a tab showing what has been
 classified as other?" — because an unexplained bucket cannot be reviewed. It is derived from the
 Landing pages pull, so its Data completeness row mirrors that tab's, with `derived from Landing
 pages` in the notes.
+
+**The Categorisation rules tab.** Directly after Other pages: the classification itself, made
+inspectable. One row per page type, in the order the rules are applied (first match wins, so the
+order is part of the rule), holding the page type's name, **the exact regex used to classify it —
+verbatim, exactly as the code ran it**, the number of landing pages it matched, and one example
+URL it matched. Close with one row per artefact bucket in the same shape, and a final `Other` row
+stating it is the residual: the sub-5% types it absorbed (named) plus everything no regex matched.
+This tab is why a reviewer can check the roll-up instead of trusting it. It is built from the
+audit's own logic, not from a GA4 response, so it gets no Data completeness row and no chart.
 
 ### Sampling is reported, never repaired
 
@@ -649,7 +674,8 @@ One `.xlsx`, built with openpyxl, in this tab order:
 | **Data completeness** | One row per data tab, from the records kept in Step 3: rows in the tab, rows GA4 matched, truncated, sampled (with `GA4 estimate — no exact route exists` in the notes when it is), thresholded, `(other)` row present, and a notes column. **No "% of data read" column** — `sampled` already answers the question the tab is asked, and a percentage that is `null` more often than not invited a reader to treat a blank as 100%. Second tab deliberately — a caveat you have to scroll to is a caveat nobody reads. See [What belongs in the Tab column](#what-belongs-in-the-tab-column) |
 | **Funnel**, then **Funnel x Device**, **Funnel x Channel** and **Funnel x Landing page** | The confirmed funnel joined to its whole-property drop-off, then one crosstab per tab. One table per sheet, laid out as [The funnel tabs](#the-funnel-tabs) describes. **No Tracking notes block** |
 | **One tab per Step 3 slice** | The full table for that slice, named plainly (`Landing pages`, `LP x Device`, `LP x Channel`, `Page types`, `Sources`, `Campaigns`, `Devices`, `New vs returning`, `Countries`, `Daily trend`, `Events by day`, `Items`…). Where the user asked for both channel groupings, the two tabs say which is which (`Channel (default)`, `Channel (custom)`). Conversion columns are the funnel's final event (`Purchases`), never `Key events` |
-| **Other pages** | Directly after Page types: every landing page classified `Other`, per [the Page types section](#page-types-the-buckets-the-small-roll-up-and-the-other-pages-tab) |
+| **Other pages** | Directly after Page types: every landing page rolled into `Other`, with the page type it was classified as, per [the Page types section](#page-types-the-buckets-the-one-other-row-and-the-categorisation-tabs) |
+| **Categorisation rules** | Directly after Other pages: one row per page type — the exact regex used, in the order applied, its match count, and an example URL — per [the Page types section](#page-types-the-buckets-the-one-other-row-and-the-categorisation-tabs) |
 | **Opportunities** | Every candidate from Step 4 — KEEP, STRETCH and DROP: the measured gap, the segment's users over the range, users per arm, the arm count, the baseline per-user rate, `n·p`, the detectable relative effect (or `cannot be powered`), the verdict, and the reason. The context line states the constant, the confidence and power, and the unit |
 | **Hypotheses** | One row per KEEP or STRETCH test: name, IF, THEN, BECAUSE, evidence (tab + row/segment it traces to), pages, audience, primary metric, secondary metrics, expected MDE, its Step 4 verdict, the seven priority sub-scores, total, rank |
 
@@ -660,6 +686,11 @@ Rules for the build:
   text can do neither.
 - Formatting is light and consistent: bold header row (white on blue `#2F6BED`), freeze the header,
   autofilter on every data tab.
+- **The font is Calibri, 11pt, everywhere — cells and charts alike.** Every `Font(...)` you
+  construct passes `name="Calibri"` explicitly (a header font built as `Font(bold=True,
+  color="FFFFFF")` leaves the name to chance); unstyled cells are already right, since openpyxl's
+  default workbook font is Calibri 11. The chart code below pins Calibri on every text element
+  via `DrawFont(typeface="Calibri")` — keep that typeface if you touch it.
 - **Charts go on the same tab as the data they plot**, to the right of the table — not on a charts
   tab of their own. That is the team's explicit preference: the point of a chart here is to be seen
   while reading the numbers it came from. See [Charts](#charts) below for which tabs get one and how
@@ -681,8 +712,8 @@ workbook, spelled exactly as the sheet is spelled.** Nothing else goes in that c
 value there does not match a sheet name, the row should not exist.
 
 That means rows for the data tabs and nothing more. **No rows for `README`, `Data completeness`,
-`Opportunities` or `Hypotheses`** — none of them comes from a GA4 response, so there is no
-completeness to report and the row can only be blank. A blank row on a completeness tab is worse
+`Categorisation rules`, `Opportunities` or `Hypotheses`** — none of them comes from a GA4
+response, so there is no completeness to report and the row can only be blank. A blank row on a completeness tab is worse
 than no row: it reads as a tab that was checked and found fine.
 
 **And no rows for your data-quality flags.** The shipped run put
@@ -942,7 +973,7 @@ the same rows, so the charts read as views of one table.
 | Events by day | Line, one series per event, top 8 events only | 20 lines is a scribble; the table still holds all 20. The correlation row is a summary, not a date — `last_row` for these charts is the last date row |
 | Items | Grouped bar of items viewed, added to cart and purchased, top 15 products; a **second chart** of add-to-cart rate and purchase rate over the same products | The three counts share a scale; the two rates share a scale; counts and rates do not — two charts beat one chart hiding half the tab's metrics |
 | Opportunities | Bar of the detectable relative effect per candidate, KEEP first | `cannot be powered` rows are left out of the chart and stay in the table |
-| Data completeness, Hypotheses, README | No chart | Neither prose nor a manifest plots |
+| Data completeness, Categorisation rules, Hypotheses, README | No chart | Neither prose nor a manifest plots |
 
 **Every chart is labelled on both axes.** Pass `x_title` and `y_title` on every call, and `y2_title`
 whenever there is a secondary series. A chart whose axes are unlabelled is asking the reader to
@@ -981,7 +1012,8 @@ def _style_axis(axis, *, title, number_format=None, gridlines=False, rotation=No
     if axis.title is not None:
         axis.title.overlay = False
         axis.title.tx.rich.p[0].pPr = ParagraphProperties(
-            defRPr=CharacterProperties(sz=900, b=False, solidFill=AXIS_TEXT))
+            defRPr=CharacterProperties(sz=900, b=False, solidFill=AXIS_TEXT,
+                                       latin=DrawFont(typeface="Calibri")))
     if number_format:
         axis.numFmt = number_format
     axis.majorTickMark, axis.minorTickMark = "out", "none"
@@ -1022,7 +1054,8 @@ def add_chart(ws, *, kind, header_row, first_row, last_row, cat_col, value_cols,
     primary.title = title
     primary.title.overlay = False          # or Excel draws it inside the plot area
     primary.title.tx.rich.p[0].pPr = ParagraphProperties(
-        defRPr=CharacterProperties(sz=1100, b=True, solidFill=INK))
+        defRPr=CharacterProperties(sz=1100, b=True, solidFill=INK,
+                                   latin=DrawFont(typeface="Calibri")))
     primary.height, primary.width = 8.5, 17
     primary.roundedCorners = False
     primary.varyColors = False             # or a one-series bar gets a colour and a legend per point
@@ -1168,10 +1201,14 @@ width is at least the longest `display_len` in it (or that the column wraps and 
 that every context line is either unwrapped with no row height or merged with one — a wrapped
 banner with no height set is the crammed-cell bug. **Assert set equality on the Data completeness tab**: the
 values in its `Tab` column, as a set, equal `wb.sheetnames` minus `README`, `Data completeness`,
-`Opportunities` and `Hypotheses` — no extras, nothing missing, and every value an exact sheet name.
+`Categorisation rules`, `Opportunities` and `Hypotheses` — no extras, nothing missing, and every
+value an exact sheet name.
 A missing row reads as "that tab was fine", and an extra row is either a tab you renamed or a
 data-quality flag that has wandered onto the wrong tab. Set equality catches both, where eyeballing
-the column catches neither. **Three more, from the review round:** assert no header cell anywhere
+the column catches neither. **Assert the font**: every styled
+cell's `font.name` is `Calibri` or `None` (unset inherits the Calibri default) — one Arial header
+makes the whole workbook look assembled from two files. **Three more, from the review round:**
+assert no header cell anywhere
 in the workbook reads `Key events` (the aggregate the review deleted — its reappearance is a
 regression, not a choice); assert the three conditional-formatting scales exist on their ranges
 with the orientations the table above fixes; and after the recalculation pass, assert the
