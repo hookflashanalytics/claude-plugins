@@ -15,23 +15,60 @@
 | `add_payment_info` | Payment step (Shopify pixel: `payment_info_submitted`). Stop before paying; do not enter card data. **Whole-cart event.** |
 | `purchase` | Order confirmation. Do not test unless the user explicitly authorises a real/test order. **Whole-cart event.** |
 
-Default coverage expectation (when the user has no spec): item events should carry `currency`, `value`, item `id`, `name`, `brand`, `category`, `variant`, `price`, `quantity`. Coupon/discount/tax fields are frequently null pre-checkout. Always prefer the user's own spec over this default.
+Default coverage expectation (when the user has no spec): see "The standard GA4 spec" below. Always prefer the user's own spec over this default.
 
 ### Delta vs whole-cart (the most common misjudgement)
 
 `add_to_cart` and `remove_from_cart` report **what moved**, never the cart that it moved into or out of. If the cart already holds 2 x Product X at £10 and the user adds one more, the correct push is `quantity: 1` and `value: 10`. A push carrying `quantity: 3` and `value: 30` there is reporting the resulting cart line, which is a **fail**, not a pass. Every other cart-stage event (`view_cart`, `begin_checkout`, `add_shipping_info`, `add_payment_info`, `purchase`) is the opposite: whole cart, `value` = cart total. See "What `value`, `quantity` and `items` should mean" in SKILL.md for the worked table.
 
+## The spec
+
+What each event should carry. `scripts/checklist_to_spec.py` writes it from any QA checklist workbook (the Doc Creator's export, the QA team's template, a previous run); for a dataLayer guide you write it yourself, one event per slide, the parameter table as the rows:
+
+```json
+{
+  "client": "Example Store", "batch": "Batch 1", "source": "Example Store DataLayer Guide",
+  "events": [
+    {"category": "Ecom", "event": "add_to_cart", "variant": "",
+     "trigger": "When a user adds an item to their cart.", "note": "",
+     "params": [
+       {"name": "event", "type": "String", "required": "Yes", "expected": "add_to_cart"},
+       {"name": "value", "type": "Number", "required": "Yes", "expected": "129.99"},
+       {"name": "coupon", "type": "String", "required": "If available", "expected": "SUMMER10"}
+     ]}
+  ]
+}
+```
+
+- `category`: `Ecom` (GA4 ecommerce events), `Non-Ecom` (custom events) or `Recurring` (anything under a guide's "Recurring Events" divider).
+- `type`: as the spec says: `String`, `Number`, `Double`, `Boolean`, `Array`, `Object`. `required`: `Yes`, `No` or `If available` (a guide without a Required column: `Yes`, or `If available` where it says "if available/applicable").
+- `expected`: the example value, as a string, exactly as the push should carry it. The `event` row comes first; a grouped event's rows are `event` (the group name) then `event_name`.
+- Item-level params (`item_id`, `price`, ...) are one row each, for the first item: `build_report.py` checks them on every entry of `items[]`.
+
+### The standard GA4 spec (no spec given)
+
+Every event: `event` (String, Yes, the event name). Then:
+
+| Event | Params (type, required) |
+|---|---|
+| `view_item_list` | currency (String, Yes), item_list_name (String, If available), item_id (String, Yes), item_name (String, Yes), index (Number, If available), item_brand, item_category, item_variant (String, If available), price (Number, Yes) |
+| `select_item`, `view_item`, `add_to_cart`, `remove_from_cart`, `view_cart`, `begin_checkout`, `add_shipping_info`, `add_payment_info` | currency (String, Yes), value (Number, Yes), item_id, item_name (String, Yes), item_brand, item_category, item_variant (String, If available), price, quantity (Number, Yes) |
+| `purchase` | the row above, plus transaction_id (String, Yes), tax, shipping (Number, If available), coupon (String, If available) |
+
+Leave `expected` blank in the default spec (there is no guide to take examples from): every Value check is then yours to judge, which the build lists for you.
+
 ## events.json schema
 
-A list, one object per event, in funnel order. Fields (see the header of `scripts/build_report.py` for the authoritative list):
+The spec's shape, plus what you captured. One entry per event **tested**, in funnel order (see the header of `scripts/build_report.py` for the authoritative list):
 
-- `event`: event name.
-- `source`: `"Top frame"` | `"Web pixel"` | `"Not fired"`. Drives the Source column.
-- `conditions`: what you did to trigger it.
-- `push`: the captured object (a dict). Dumped verbatim with `indent=2`. Use `null` only when nothing was captured and there is no shape to show (then set `push_note`).
+- `client`, `batch`, `source` (where the expected params came from), `site`, `tested` (date): the title bars.
+- Per event: `category`, `event`, `variant` (which trigger, e.g. `PDP` / `Mini-bag` / `Cart trash`, `""` if only one), `trigger` (what you did), `note` (findings, fragments), `params` (the spec's rows for this event).
+- `source`: `"Top frame"` | `"Web pixel"` | `"Not fired"`.
+- `push`: the captured object (a dict), dumped verbatim with `indent=2` onto Captured pushes, and read for the checks. `null` only when nothing was captured and there is no shape to show (then set `push_note`).
 - `push_note`: shown only when `push` is null.
+- `name_seen`: the event name when it rides beside the payload rather than in it (gtag's second argument, Tealium's `tealium_event`, `Shopify.analytics.publish`'s first). Lets the `event` row pass.
 - `location_image`: filename in the screenshots dir. Prefer a **tight crop saved via the `computer` `zoom` action** (no further cropping needed). `location_bbox` `[x,y,w,h]` + `viewport_w` are still supported as a fallback but should be avoided, ship a pre-cropped image instead.
-- `verdict`: `pass` | `fail` | `warn` | `na`. `notes`: list of `"- ..."` bullets. No em/en dashes.
+- On a param row, optionally: `present` / `value_ok` (`Pass` | `Fail` | `N/A`) to set or override a check, and `notes` (a fragment). No em/en dashes in anything you write.
 
 ### Web-pixel push with unreadable values
 
@@ -119,7 +156,7 @@ If a funnel action produces no entry, do not conclude "missing" yet, check for a
 ### Click-then-navigate and load-only events
 
 - **Click-then-navigate** (`select_item`): the hook installs a `pagehide` listener that writes `window.__dlqa` to `sessionStorage.__dlqa_carry`. After the navigation, read and parse `sessionStorage.__dlqa_carry` on the new page.
-- **Load-only** (`view_item_list`): fires once at document load before any injectable hook. It is almost always still capturable by re-firing the builder, see next section. Only fall back to `push: null` + `push_note` + `warn` + GA4 DebugView after every re-fire attempt fails. Do not fabricate values.
+- **Load-only** (`view_item_list`): fires once at document load before any injectable hook. It is almost always still capturable by re-firing the builder, see next section. Only fall back to `push: null` + `push_note` + blank checks + GA4 DebugView after every re-fire attempt fails. Do not fabricate values.
 
 ## Re-firing a load-only builder event (do this before giving up)
 
@@ -154,7 +191,7 @@ The wrapped hook captures whatever the builder publishes, that payload is the gr
 
 **2. Trigger a real re-render** if the arg cannot be reconstructed. Use the collection's own controls, changing sort, applying/removing a filter, clicking pagination or "load more", or toggling country/currency, which makes the theme re-run the builder client-side while the hook is alive. Reset `window.__dlqa = []` first, then read it after.
 
-**3. Last resort only:** `push: null`, `push_note` explaining it fires pre-hook, `source` from the pixel subscription, item shape inferred from sibling events, verdict `warn`, recommend GA4 DebugView.
+**3. Last resort only:** `push: null`, `push_note` explaining it fires pre-hook, `source` from the pixel subscription, the block's checks left blank (it stays In progress), and a note recommending GA4 DebugView.
 
 ## Reading a web pixel / sandboxed source
 
@@ -178,6 +215,12 @@ clean(window.__pixelSrc.slice(idx-90, idx+320));
 
 (Keep the mask threshold above ~26 chars so real param names like `contains_from_mini_bag` survive; only long minified identifiers get masked.) If the source cannot be fetched (truly third-party origin, no CORS), fall back to verifying those events in GTM Preview / Tag Assistant or GA4 DebugView, and say so in the notes. Never guess values.
 
-## Report columns
+## The workbook
 
-Event name | Source | Conditions tested | dataLayer push (verbatim JSON) | Location screenshot | Pass/Fail (bullets). Rows auto-size to fit. Keep the output filename short (~12 chars max, generic), deep session paths hit the Windows 259-char limit and the workbook will not open.
+The QA team's checklist layout, built by `scripts/qa_checklist.py` (the same file ships in Tapa's DataLayer Doc Creator, keep the two identical):
+
+- **Summary**: How to use, then `# | Category | Event | Variant / label | Trigger | Params | Status`, and `Passed: n / N`.
+- **QA Checklist**: per block, the title (`N.  event   ·   variant`), category badge, status and a **Push** link; the `Trigger: ...   |   Note: ...` strip; then `Parameter | Type | Required | Expected value / example | Present / fired? | Value correct? | Notes`. Status = Fail if any check fails, In progress if any listed parameter has a blank check, Pass otherwise (N/A counts as passed). The formulas stay live and carry cached results, so Protected View and file previewers show the statuses too.
+- **Captured pushes**: `# | Event | Source | Conditions tested | dataLayer push (verbatim JSON) | Location screenshot`, one row per block. A push longer than ~34 lines passes Excel's 409pt row ceiling: the cell still holds all of it (select it to read the rest).
+
+Keep the output filename short (~12 chars max, generic), deep session paths hit the Windows 259-char limit and the workbook will not open.
